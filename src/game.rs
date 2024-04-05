@@ -10,7 +10,7 @@ pub struct Game {
 impl Game {
     pub fn new() -> Self {
         Self {
-            // position: Position::new(),
+            position: Position::new(),
             current_player: Color::White,
             game_result: GameResult::Ongoing,
         }
