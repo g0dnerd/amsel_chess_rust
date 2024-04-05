@@ -2,9 +2,9 @@ use std::ops::Not;
 
 mod bitboard;
 pub mod position;
-mod piece;
 mod state;
 // mod game;
+// mod piece;
 
 /* Represents a single square on the board.
 / Representation: 0-63, with 0 being a1 and 63 being h8. */

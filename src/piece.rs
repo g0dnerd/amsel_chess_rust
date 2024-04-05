@@ -12,8 +12,8 @@ pub struct Piece(pub u8);
 
 impl Piece {
     /* Returns the color for the pieces. Uses the bit method from the BitIndex trait to get the first bit
-    / (with 7 being the least significant bit)
-    / and converts the resulting bool to a color by using the into method */
+    / (with 7 being the LSB) and converts
+    / the resulting bool to a color by using the into method */
     pub fn get_color(&self) -> Color {
         self.0.bit(7).into()
     }
@@ -47,8 +47,6 @@ impl Piece {
     // Debug method to check if the piece is invalid
     pub fn is_invalid(&self) -> bool {
         // Return true if bits 1-6 are all 0
-        // Bits 0 and 7 are allowed to be 1
-        println!("is_invalid called, piece is {:?}", self.0);
         self.0 & 0b01111110 == 0
     }
 }

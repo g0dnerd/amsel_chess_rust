@@ -17,7 +17,6 @@ impl Game {
     }
 
     pub fn make_move(&mut self, _from: u8, _to: u8) {
-        // TODO
         // Switch the current player
         self.current_player = !self.current_player;
     }

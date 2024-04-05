@@ -32,9 +32,9 @@ impl State {
 pub struct CastlingRights(u8);
 
 impl CastlingRights {
-    fn empty() -> Self {
+    /* fn empty() -> Self {
         Self(Castling::NO_CASTLING)
-    }
+    } */
     fn all() -> Self {
         Self::default()
     }
