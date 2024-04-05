@@ -1,5 +1,4 @@
 pub mod bitboard;
-mod board;
 mod state;
 mod position;
 mod piece;
