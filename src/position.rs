@@ -16,7 +16,6 @@ pub struct Position {
 
 impl Position {
     // Returns an empty position
-    #[allow(dead_code)]
     pub fn new() -> Self {
         // Initialize the bitboards and piece_boards arrays with empty BitBoards
         let bitboards = [BitBoard::new(); 2];
@@ -30,7 +29,6 @@ impl Position {
     }
 
     // Prints out a visual representation of the current board state.
-    #[allow(dead_code)]
     pub fn print(&self) {
         // Print the board state
         for _rank in (0..8).rev() {
