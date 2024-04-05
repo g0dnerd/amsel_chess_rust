@@ -14,53 +14,50 @@ pub struct Position {
     piece_boards: [[BitBoard; 6]; 2],
 }
 
-impl Position {
-
-    /* Returns the piece at a given square
-    / TODO: Null handling - should this return an Option? */
-    pub fn piece_at(&self, square: Square) -> Option<(u8, Color)> {
-        let index = square.0;
-        println!("Checking for a piece at index {}", index);
-        let mask: u64 = 1 << index;
-        if self.piece_boards[0][0].0 & mask != 0 {
-            Some((Pieces::ROOK, Color::White))
-        } 
-        else if self.piece_boards[0][1].0 & mask != 0 {
-            Some((Pieces::KNIGHT, Color::White))
-        }
-        else if self.piece_boards[0][2].0 & mask != 0 {
-            Some((Pieces::BISHOP, Color::White))
-        }
-        else if self.piece_boards[0][3].0 & mask != 0 {
-            Some((Pieces::QUEEN, Color::White))
-        }
-        else if self.piece_boards[0][4].0 & mask != 0 {
-            Some((Pieces::KING, Color::White))
-        }
-        else if self.piece_boards[0][5].0 & mask != 0 {
-            Some((Pieces::PAWN, Color::White))
-        }
-        else if self.piece_boards[1][0].0 & mask != 0 {
-            Some((Pieces::ROOK, Color::Black))
-        }
-        else if self.piece_boards[1][1].0 & mask != 0 {
-            Some((Pieces::KNIGHT, Color::Black))
-        }
-        else if self.piece_boards[1][2].0 & mask != 0 {
-            Some((Pieces::BISHOP, Color::Black))
-        }
-        else if self.piece_boards[1][3].0 & mask != 0 {
-            Some((Pieces::QUEEN, Color::Black))
-        }
-        else if self.piece_boards[1][4].0 & mask != 0 {
-            Some((Pieces::KING, Color::Black))
-        }
-        else if self.piece_boards[1][5].0 & mask != 0 {
-            Some((Pieces::PAWN, Color::Black))
-        } else {
-            println!("No piece found at square {}", index);
-            None
-        }
+/* Returns the piece at a given square
+/ TODO: Null handling - should this return an Option? */
+pub fn piece_at(pos: &Position, square: Square) -> Option<(u8, Color)> {
+    let index = square.0;
+    println!("Checking for a piece at index {}", index);
+    let mask: u64 = 1 << index;
+    if pos.piece_boards[0][0].0 & mask != 0 {
+        Some((Pieces::ROOK, Color::White))
+    } 
+    else if pos.piece_boards[0][1].0 & mask != 0 {
+        Some((Pieces::KNIGHT, Color::White))
+    }
+    else if pos.piece_boards[0][2].0 & mask != 0 {
+        Some((Pieces::BISHOP, Color::White))
+    }
+    else if pos.piece_boards[0][3].0 & mask != 0 {
+        Some((Pieces::QUEEN, Color::White))
+    }
+    else if pos.piece_boards[0][4].0 & mask != 0 {
+        Some((Pieces::KING, Color::White))
+    }
+    else if pos.piece_boards[0][5].0 & mask != 0 {
+        Some((Pieces::PAWN, Color::White))
+    }
+    else if pos.piece_boards[1][0].0 & mask != 0 {
+        Some((Pieces::ROOK, Color::Black))
+    }
+    else if pos.piece_boards[1][1].0 & mask != 0 {
+        Some((Pieces::KNIGHT, Color::Black))
+    }
+    else if pos.piece_boards[1][2].0 & mask != 0 {
+        Some((Pieces::BISHOP, Color::Black))
+    }
+    else if pos.piece_boards[1][3].0 & mask != 0 {
+        Some((Pieces::QUEEN, Color::Black))
+    }
+    else if pos.piece_boards[1][4].0 & mask != 0 {
+        Some((Pieces::KING, Color::Black))
+    }
+    else if pos.piece_boards[1][5].0 & mask != 0 {
+        Some((Pieces::PAWN, Color::Black))
+    } else {
+        println!("No piece found at square {}", index);
+        None
     }
 }
 
@@ -114,7 +111,7 @@ pub fn print_position(pos: Position) {
     let mut board = [[0; 8]; 8];
     for i in 0..64 {
         println!("Checking square {}", i);
-        match pos.piece_at(Square(i)) {
+        match piece_at(&pos, Square(i)) {
             Some((piece, color)) => {
                 println!("Found a piece at square {}: {:?}", i, color);
                 let x = i % 8;
