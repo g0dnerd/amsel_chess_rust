@@ -1,1 +1,1 @@
-# asmel_chess_rust
+# amsel_chess_rust
