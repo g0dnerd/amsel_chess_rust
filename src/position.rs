@@ -1,7 +1,5 @@
 use crate::bitboard::BitBoard;
 use crate::{Color, Square, Pieces, get_piece_representation};
-use crate::piece::Piece;
-use bit::BitIndex;
 
 // A position contains the minimum amount of information necessary to calculate moves and evaluate the board state.
 
@@ -15,7 +13,7 @@ pub struct Position {
 }
 
 /* Returns the piece at a given square
-/ TODO: Null handling - should this return an Option? */
+/ or None if the square is empty */
 pub fn piece_at(pos: &Position, square: Square) -> Option<(u8, Color)> {
     let index = square.0;
     println!("Checking for a piece at index {}", index);
