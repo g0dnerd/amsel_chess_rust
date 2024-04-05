@@ -1,7 +1,9 @@
 use crate::bitboard::BitBoard;
 use crate::{Color, Square, Pieces, get_piece_representation};
+use crate::state::State;
 
-// A position contains the minimum amount of information necessary to calculate moves and evaluate the board state.
+/* A position contains the minimum amount of information necessary
+/ for the engine to calculate moves and evaluate the board state. */ 
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub struct Position {
@@ -10,13 +12,14 @@ pub struct Position {
 
     // Array of arrays of BitBoards, one for each piece type for each side
     piece_boards: [[BitBoard; 6]; 2],
+
+    state: State,
 }
 
 /* Returns the piece at a given square
 / or None if the square is empty */
 pub fn piece_at(pos: &Position, square: Square) -> Option<(u8, Color)> {
     let index = square.0;
-    println!("Checking for a piece at index {}", index);
     let mask: u64 = 1 << index;
     if pos.piece_boards[0][0].0 & mask != 0 {
         Some((Pieces::ROOK, Color::White))
@@ -54,7 +57,6 @@ pub fn piece_at(pos: &Position, square: Square) -> Option<(u8, Color)> {
     else if pos.piece_boards[1][5].0 & mask != 0 {
         Some((Pieces::PAWN, Color::Black))
     } else {
-        println!("No piece found at square {}", index);
         None
     }
 }
@@ -100,6 +102,7 @@ pub fn init_bitboards() -> Position {
     Position {
         color_bitboards: bitboards,
         piece_boards,
+        state: State::new(),
     }    
 
 }
@@ -108,10 +111,8 @@ pub fn init_bitboards() -> Position {
 pub fn print_position(pos: Position) {
     let mut board = [[0; 8]; 8];
     for i in 0..64 {
-        println!("Checking square {}", i);
         match piece_at(&pos, Square(i)) {
             Some((piece, color)) => {
-                println!("Found a piece at square {}: {:?}", i, color);
                 let x = i % 8;
                 let y = i / 8;
                 board[y][x] = match color {
@@ -119,7 +120,7 @@ pub fn print_position(pos: Position) {
                     Color::Black => piece + 7,
                 };
             },
-            None => println!("No piece found at square {}", i),
+            None => ()
         }
     }
     for row in board.iter() {

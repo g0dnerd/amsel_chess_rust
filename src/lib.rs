@@ -3,14 +3,15 @@ use std::ops::Not;
 mod bitboard;
 pub mod position;
 mod piece;
+mod state;
 // mod game;
 
 /* Represents a single square on the board.
 / Representation: 0-63, with 0 being a1 and 63 being h8. */
-#[derive(Debug)]
+#[derive(Debug, Clone, Hash, Eq, PartialEq)]
 pub struct Square(usize);
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Hash, Eq, PartialEq)]
 pub enum Color {
     Black,
     White,
@@ -57,4 +58,19 @@ pub const PIECE_REPRESENTATIONS: [char; 13] = [
 
 pub fn get_piece_representation(piece: u8) -> char {
     PIECE_REPRESENTATIONS[piece as usize]
+}
+
+pub struct Castling;
+impl Castling {
+    pub const NO_CASTLING: u8 = 0;
+    pub const WHITE_KING_SIDE: u8 = 0b00001000;
+    pub const WHITE_QUEEN_SIDE: u8 = 0b00000100;
+    pub const BLACK_KING_SIDE: u8 = 0b00000010;
+    pub const BLACK_QUEEN_SIDE: u8 = 0b00000001;
+
+    pub const BOTH_KING_SIDES: u8 = Self::WHITE_KING_SIDE | Self::BLACK_KING_SIDE;
+    pub const BOTH_QUEEN_SIDES: u8 = Self::WHITE_QUEEN_SIDE | Self::BLACK_QUEEN_SIDE;
+    pub const WHITE_CASTLING: u8 = Self::WHITE_KING_SIDE | Self::WHITE_QUEEN_SIDE;
+    pub const BLACK_CASTLING: u8 = Self::BLACK_KING_SIDE | Self::BLACK_QUEEN_SIDE;
+    pub const ANY_CASTLING: u8 = Self::WHITE_CASTLING | Self::BLACK_CASTLING;
 }
