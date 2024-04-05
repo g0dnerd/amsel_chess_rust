@@ -7,7 +7,7 @@ use crate::{Color, Pieces};
 / last bit: whether the piece has moved (0 for no, 1 for yes)
 */
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Piece(pub u8);
 
 impl Piece {
@@ -46,6 +46,9 @@ impl Piece {
 
     // Debug method to check if the piece is invalid
     pub fn is_invalid(&self) -> bool {
+        // Return true if bits 1-6 are all 0
+        // Bits 0 and 7 are allowed to be 1
+        println!("is_invalid called, piece is {:?}", self.0);
         self.0 & 0b01111110 == 0
     }
 }
