@@ -40,7 +40,7 @@ impl Position {
         // White King
         piece_boards[0][4] = BitBoard::from_u64(0b10000);
         // White Pawns
-        piece_boards[0][5] = BitBoard::from_u64(0b1111111100000000);
+        piece_boards[0][5] = BitBoard::from_u64(0b1111111000000000);
 
         // Initialize the piece bitboards for the black pieces in their starting positions
         // Black Rooks
@@ -80,7 +80,7 @@ impl Position {
                 None => ()
             }
         }
-        for row in board.iter() {
+        for row in board.iter().rev() {
             for square in row.iter() {
                 print!("{} ", get_piece_representation(*square as u8));
             }
@@ -159,70 +159,62 @@ impl Position {
      */
 
     pub fn get_rook_moves(&self, origin: &Square) -> BitBoard {
-        let mut moves: u64 = 0;
-
-        // Generate horizontal moves
-        let file = origin.0 % 8;
-        let rank = origin.0 / 8;
-        let mut mask = BitBoard::from_u64(0x0101010101010101).0 << file;
-        mask &= !BitBoard::from_u64(1).0 << origin.0;
-        moves |= mask << (rank * 8);
-
-        // Generate vertical moves
-        mask = BitBoard::from_u64(0xFF).0 << (rank * 8);
-        mask &= !BitBoard::from_u64(1).0 << origin.0;
-        moves |= mask.rotate_right(file as u32);
-
-        // Apply blocking masks
-        let not_occupied = !(self.color_bitboards[0].0 | self.color_bitboards[1].0);
-        let blocking_mask = !not_occupied;
-
-        moves &= blocking_mask;
-
-        BitBoard::from_u64(moves)
+            
+            let square_bb = BitBoard::from_index(origin.0);
+            let mut rook_moves = BitBoard::empty();
+    
+            // Calculate all possible rook moves relative to the current square
+            rook_moves |= square_bb.shift_north();
+            rook_moves |= square_bb.shift_south();
+            rook_moves |= square_bb.shift_east();
+            rook_moves |= square_bb.shift_west();
+    
+            // Filter out moves that go off the board
+            // let not_occupied = !(self.color_bitboards[0].0 | self.color_bitboards[1].0);
+            rook_moves /*& not_occupied*/
     }
 
     pub fn get_knight_moves(&self, origin: &Square) -> BitBoard {
         
         let square_bb = BitBoard::from_index(origin.0);
-        let mut knight_moves: u64 = 0;
+        let mut knight_moves = BitBoard::empty();
 
-        knight_moves |= square_bb.shift_north().shift_north().shift_east().0;
-        knight_moves |= square_bb.shift_north().shift_north().shift_west().0;
-        knight_moves |= square_bb.shift_south().shift_south().shift_east().0;
-        knight_moves |= square_bb.shift_south().shift_south().shift_west().0;
-        knight_moves |= square_bb.shift_west().shift_west().shift_south().0;
-        knight_moves |= square_bb.shift_west().shift_west().shift_north().0;
-        knight_moves |= square_bb.shift_east().shift_east().shift_south().0;
-        knight_moves |= square_bb.shift_east().shift_east().shift_north().0;
+        knight_moves |= square_bb.shift_north().shift_north().shift_east();
+        knight_moves |= square_bb.shift_north().shift_north().shift_west();
+        knight_moves |= square_bb.shift_south().shift_south().shift_east();
+        knight_moves |= square_bb.shift_south().shift_south().shift_west();
+        knight_moves |= square_bb.shift_west().shift_west().shift_south();
+        knight_moves |= square_bb.shift_west().shift_west().shift_north();
+        knight_moves |= square_bb.shift_east().shift_east().shift_south();
+        knight_moves |= square_bb.shift_east().shift_east().shift_north();
 
         // Filter out moves that are blocked by occupied squares
-        let not_occupied = !(self.color_bitboards[0].0 | self.color_bitboards[1].0);
-        BitBoard::from_u64(knight_moves & not_occupied)
+        let not_occupied = !(self.color_bitboards[0] | self.color_bitboards[1]);
+        knight_moves & not_occupied
     }
 
     pub fn get_bishop_moves(&self, origin: &Square) -> BitBoard {
     
         // Calculate bishop moves relative to the current square
         let square_bb = BitBoard::from_index(origin.0);
-        let mut bishop_moves: u64 = 0;
+        let mut bishop_moves = BitBoard::empty();
     
         // Calculate all possible bishop moves relative to the current square
-        bishop_moves |= square_bb.diagonal_north_east().0;
-        bishop_moves |= square_bb.diagonal_north_west().0;
-        bishop_moves |= square_bb.diagonal_south_east().0;
-        bishop_moves |= square_bb.diagonal_south_west().0;
+        bishop_moves |= square_bb.diagonal_north_east();
+        bishop_moves |= square_bb.diagonal_north_west();
+        bishop_moves |= square_bb.diagonal_south_east();
+        bishop_moves |= square_bb.diagonal_south_west();
     
         // Filter out moves that go off the board
-        let not_occupied = !(self.color_bitboards[0].0 | self.color_bitboards[1].0);
-        BitBoard::from_u64(bishop_moves & not_occupied)
+        let not_occupied = !(self.color_bitboards[0] | self.color_bitboards[1]);
+        bishop_moves & not_occupied
     }
 
     pub fn get_queen_moves(&self, origin: &Square) -> BitBoard {
         let rook_moves = self.get_rook_moves(origin);
         let bishop_moves = self.get_bishop_moves(origin);
-        let queen_moves = rook_moves.0 | bishop_moves.0;
-        BitBoard::from_u64(queen_moves)
+        let queen_moves = rook_moves | bishop_moves;
+        queen_moves
     }
 
     // TODO: Pawn moves

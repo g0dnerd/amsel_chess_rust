@@ -11,6 +11,12 @@ mod state;
 #[derive(Debug, Clone, Hash, Eq, PartialEq)]
 pub struct Square(usize);
 
+impl Square {
+    pub fn new(index: usize) -> Self {
+        Self(index)
+    }
+}
+
 #[derive(Debug, Clone, Copy, Hash, Eq, PartialEq)]
 pub enum Color {
     Black,
@@ -53,7 +59,7 @@ impl Pieces {
 }
 
 pub const PIECE_REPRESENTATIONS: [char; 13] = [
-    '-', 'r', 'n', 'b', 'q', 'k', 'p', 'R', 'N', 'B', 'Q', 'K', 'P'
+    '-', 'R', 'N', 'B', 'Q', 'K', 'P', 'r', 'n', 'b', 'q', 'k', 'p'
 ];
 
 pub fn get_piece_representation(piece: u8) -> char {
@@ -73,4 +79,12 @@ impl Castling {
     pub const WHITE_CASTLING: u8 = Self::WHITE_KING_SIDE | Self::WHITE_QUEEN_SIDE;
     pub const BLACK_CASTLING: u8 = Self::BLACK_KING_SIDE | Self::BLACK_QUEEN_SIDE;
     pub const ANY_CASTLING: u8 = Self::WHITE_CASTLING | Self::BLACK_CASTLING;
+}
+
+pub fn get_printable_square_from_index(index: &usize) -> String {
+    let file = index % 8;
+    let rank = index / 8;
+    let file_char = (file as u8 + 97) as char;
+    let rank_char = (rank as u8 + 49) as char;
+    format!("{}{}", file_char, rank_char)
 }
