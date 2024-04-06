@@ -1,5 +1,7 @@
 use std::ops::*;
 
+use crate::Square;
+
 // Module for the BitBoard struct
 // A BitBoard is a 64-bit integer that represents the state of a chess board.
 // They are implemented here with bit 0 being a1 and bit 63 being h8.
@@ -87,6 +89,14 @@ impl BitBoard {
 
     pub fn count_ones(&self) -> u32 {
         self.0.count_ones()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.0 == 0
+    }
+
+    pub fn contains(self, square: Square) -> bool {
+        !(self & BitBoard::from_index(square.0)).is_empty()
     }
 
     pub fn shift_east(&self) -> Self {

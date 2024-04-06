@@ -43,4 +43,8 @@ fn main() {
     for i in queen_d1_moves.iter() {
         println!("{}", amsel_chess_rust::get_printable_square_from_index(i));
     }
+
+    // Tests the magics precomputation
+    let mut rng = amsel_chess_rust::rng::Rng::default();
+    amsel_chess_rust::precompute::precompute_magics(&amsel_chess_rust::precompute::ROOK, "Rook", &mut rng);
 }

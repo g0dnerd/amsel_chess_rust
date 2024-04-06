@@ -3,17 +3,34 @@ use std::ops::Not;
 mod bitboard;
 pub mod position;
 mod state;
+pub mod rng;
+pub mod precompute;
+
 // mod game;
 // mod piece;
 
 /* Represents a single square on the board.
 / Representation: 0-63, with 0 being a1 and 63 being h8. */
-#[derive(Debug, Clone, Hash, Eq, PartialEq)]
+#[derive(Debug, Clone, Copy, Hash, Eq, PartialEq)]
 pub struct Square(usize);
 
 impl Square {
     pub fn new(index: usize) -> Self {
         Self(index)
+    }
+
+    /* Attempt to offset the square by a given delta.
+    / If the new square is out of bounds, return None. */
+    pub fn offset(&self, file_offset: i8, rank_offset: i8) -> Option<Square> {
+        let file = self.0 % 8;
+        let rank = self.0 / 8;
+        let new_file = file as i8 + file_offset;
+        let new_rank = rank as i8 + rank_offset;
+        if new_file < 0 || new_file > 7 || new_rank < 0 || new_rank > 7 {
+            None
+        } else {
+            Some(Square((new_rank as usize) * 8 + new_file as usize))
+        }
     }
 }
 
