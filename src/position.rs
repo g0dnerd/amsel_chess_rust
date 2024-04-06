@@ -10,8 +10,8 @@ pub struct Position {
     // Array of two BitBoards, one for each side
     color_bitboards: [BitBoard; 2],
 
-    // Array of arrays of BitBoards, one for each piece type for each side
-    piece_boards: [[BitBoard; 6]; 2],
+    // Array of BitBoards, one for each piece type
+    piece_boards: [BitBoard; 6],
 
     state: State,
 }
@@ -20,7 +20,7 @@ impl Position {
 
     pub fn new () -> Position {
         let mut bitboards = [BitBoard::empty(); 2];
-        let mut piece_boards = [[BitBoard::empty(); 6]; 2];
+        let mut piece_boards = [BitBoard::empty(); 6];
 
         // Initialize the bitboard for both colors in their starting positions
         // White
@@ -28,33 +28,19 @@ impl Position {
         // Black
         bitboards[1] = BitBoard::from_u64(0b1111111111111111000000000000000000000000000000000000000000000000);
 
-        // Initialize the piece bitboards for the white pieces in their starting positions
-        // White Rooks
-        piece_boards[0][0] = BitBoard::from_u64(0b10000001);
-        // White Knights
-        piece_boards[0][1] = BitBoard::from_u64(0b1000010);
-        // White Bishops
-        piece_boards[0][2] = BitBoard::from_u64(0b100100);
-        // White Queens
-        piece_boards[0][3] = BitBoard::from_u64(0b1000);
-        // White King
-        piece_boards[0][4] = BitBoard::from_u64(0b10000);
-        // White Pawns
-        piece_boards[0][5] = BitBoard::from_u64(0b1111111000000000);
-
-        // Initialize the piece bitboards for the black pieces in their starting positions
-        // Black Rooks
-        piece_boards[1][0] = BitBoard::from_u64(0b1000000100000000000000000000000000000000000000000000000000000000);
-        // Black Knights
-        piece_boards[1][1] = BitBoard::from_u64(0b100001000000000000000000000000000000000000000000000000000000000);
-        // Black Bishops
-        piece_boards[1][2] = BitBoard::from_u64(0b10010000000000000000000000000000000000000000000000000000000000);
-        // Black Queens
-        piece_boards[1][3] = BitBoard::from_u64(0b100000000000000000000000000000000000000000000000000000000000);
-        // Black King
-        piece_boards[1][4] = BitBoard::from_u64(0b1000000000000000000000000000000000000000000000000000000000000);
-        // Black Pawns
-        piece_boards[1][5] = BitBoard::from_u64(0b11111111000000000000000000000000000000000000000000000000);
+        // Initialize the piece bitboards for the respective starting positions
+        // Rooks
+        piece_boards[0] = BitBoard::from_u64(0b1000000100000000000000000000000000000000000000000000000010000001);
+        // Knights
+        piece_boards[1] = BitBoard::from_u64(0b100001000000000000000000000000000000000000000000000000001000010);
+        // Bishops
+        piece_boards[2] = BitBoard::from_u64(0b10010000000000000000000000000000000000000000000000000000100100);
+        // Queens
+        piece_boards[3] = BitBoard::from_u64(0b100000000000000000000000000000000000000000000000000000001000);
+        // Kings
+        piece_boards[4] = BitBoard::from_u64(0b1000000000000000000000000000000000000000000000000000000010000);
+        // Pawns
+        piece_boards[5] = BitBoard::from_u64(0b11111111000000000000000000000000000000001111111100000000);
 
         Self {
             color_bitboards: bitboards,
@@ -92,44 +78,29 @@ impl Position {
     pub fn piece_at(&self, square: &Square) -> Option<(u8, Color)> {
         let index = square.0;
         let mask: u64 = 1 << index;
-        if self.piece_boards[0][0].0 & mask != 0 {
-            Some((Pieces::ROOK, Color::White))
-        } 
-        else if self.piece_boards[0][1].0 & mask != 0 {
-            Some((Pieces::KNIGHT, Color::White))
-        }
-        else if self.piece_boards[0][2].0 & mask != 0 {
-            Some((Pieces::BISHOP, Color::White))
-        }
-        else if self.piece_boards[0][3].0 & mask != 0 {
-            Some((Pieces::QUEEN, Color::White))
-        }
-        else if self.piece_boards[0][4].0 & mask != 0 {
-            Some((Pieces::KING, Color::White))
-        }
-        else if self.piece_boards[0][5].0 & mask != 0 {
-            Some((Pieces::PAWN, Color::White))
-        }
-        else if self.piece_boards[1][0].0 & mask != 0 {
-            Some((Pieces::ROOK, Color::Black))
-        }
-        else if self.piece_boards[1][1].0 & mask != 0 {
-            Some((Pieces::KNIGHT, Color::Black))
-        }
-        else if self.piece_boards[1][2].0 & mask != 0 {
-            Some((Pieces::BISHOP, Color::Black))
-        }
-        else if self.piece_boards[1][3].0 & mask != 0 {
-            Some((Pieces::QUEEN, Color::Black))
-        }
-        else if self.piece_boards[1][4].0 & mask != 0 {
-            Some((Pieces::KING, Color::Black))
-        }
-        else if self.piece_boards[1][5].0 & mask != 0 {
-            Some((Pieces::PAWN, Color::Black))
+        let color_mask = if self.color_bitboards[0].0 & mask != 0 {
+            Color::White
         } else {
-            None
-        }
+            Color::Black
+        };
+        
+        let piece = if let Some(piece_index) = 
+            (0..=5).find(|&i| self.piece_boards[i].0 & mask != 0) {
+                
+            match piece_index {
+                0 => Pieces::ROOK,
+                1 => Pieces::KNIGHT,
+                2 => Pieces::BISHOP,
+                3 => Pieces::QUEEN,
+                4 => Pieces::KING,
+                5 => Pieces::PAWN,
+                _ => panic!("Invalid piece index"),
+            }
+        } else {
+            return None;
+        };
+        
+        Some((piece, color_mask))
     }
 
     pub fn get_legal_moves_by_square(&self, _from: Square) -> BitBoard {
@@ -164,8 +135,8 @@ impl Position {
             let mut rook_moves = BitBoard::empty();
     
             // Calculate all possible rook moves relative to the current square
-            rook_moves |= square_bb.shift_north();
-            rook_moves |= square_bb.shift_south();
+            rook_moves |= square_bb << 8;
+            rook_moves |= square_bb >> 8;
             rook_moves |= square_bb.shift_east();
             rook_moves |= square_bb.shift_west();
     
@@ -179,14 +150,14 @@ impl Position {
         let square_bb = BitBoard::from_index(origin.0);
         let mut knight_moves = BitBoard::empty();
 
-        knight_moves |= square_bb.shift_north().shift_north().shift_east();
-        knight_moves |= square_bb.shift_north().shift_north().shift_west();
-        knight_moves |= square_bb.shift_south().shift_south().shift_east();
-        knight_moves |= square_bb.shift_south().shift_south().shift_west();
-        knight_moves |= square_bb.shift_west().shift_west().shift_south();
-        knight_moves |= square_bb.shift_west().shift_west().shift_north();
-        knight_moves |= square_bb.shift_east().shift_east().shift_south();
-        knight_moves |= square_bb.shift_east().shift_east().shift_north();
+        knight_moves |= square_bb.shift_east() << 16;
+        knight_moves |= square_bb.shift_west() << 16;
+        knight_moves |= square_bb.shift_east() >> 16;
+        knight_moves |= square_bb.shift_west() >> 16;
+        knight_moves |= square_bb.shift_west().shift_west() >> 8;
+        knight_moves |= square_bb.shift_west().shift_west() << 8;
+        knight_moves |= square_bb.shift_east().shift_east() >> 8;
+        knight_moves |= square_bb.shift_east().shift_east() << 8;
 
         // Filter out moves that are blocked by occupied squares
         let not_occupied = !(self.color_bitboards[0] | self.color_bitboards[1]);

@@ -43,6 +43,24 @@ impl_math_assign_ops! {
     BitXorAssign, bitxor_assign;
 }
 
+macro_rules! impl_shift_ops {
+    ($($trait:ident,$fn:ident;)*) => {$(
+        impl $trait<usize> for BitBoard {
+            type Output = Self;
+
+            fn $fn(self, other: usize) -> Self::Output {
+                Self(self.0.$fn(other as u32))
+            }
+        }
+    )*};
+}
+
+impl_shift_ops! {
+    Shl, shl;
+    Shr, shr;
+}
+
+
 impl Not for BitBoard {
     type Output = Self;
 
@@ -69,14 +87,6 @@ impl BitBoard {
 
     pub fn count_ones(&self) -> u32 {
         self.0.count_ones()
-    }
-
-    pub fn shift_north(&self) -> Self {
-        Self(self.0 << 8)
-    }
-
-    pub fn shift_south(&self) -> Self {
-        Self(self.0 >> 8)
     }
 
     pub fn shift_east(&self) -> Self {
