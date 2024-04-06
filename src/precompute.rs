@@ -3,7 +3,10 @@ use crate::bitboard::BitBoard;
 use crate::Square;
 
 /* This module contains the logic to precompute a magic number for a given slider piece and square
-/ that perfectly maps input blockers into a hash table. */
+/ that perfectly maps input blockers into a hash table.
+/ Heavy inspiration and support was taken from and many thanks are given to the magic-bitboards demo at
+/ https://github.com/analog-hors/magic-bitboards-demo
+/ licensed under the MIT License at https://spdx.org/licenses/MIT.html */
 
 pub struct SlidingPiece {
     directions: [(i8, i8); 4],
@@ -77,9 +80,10 @@ fn magic_index(entry: &MagicEntry, blockers: BitBoard) -> usize {
 
     // Multiply the blockers by the magic number to get the index.
     let hash = blockers.0.wrapping_mul(entry.magic);
+    // println!("Attemping to find magic index for blockers: {:?} with hash {}", blockers, hash);
 
     // Shift the hash to the right by 64 - that entry's shift value to get the index.
-    let index = (hash >> (64 - entry.shift)) as usize;
+    let index = (hash >> entry.shift) as usize;
 
     index
 }
@@ -128,7 +132,7 @@ fn attempt_magics(
 
     // Get the actual index value.
     let shift = 64 - entry.shift;
-
+    
     // Create a table with the corresponding size.
     let mut table = vec![BitBoard::empty(); 1 << shift];
     let mut blockers = BitBoard::empty();
@@ -165,6 +169,12 @@ pub fn precompute_magics(
     sliding_piece: &SlidingPiece,
     piece_name: &str,
     rng_instance: &mut Rng) {
+        println!("Computing magics for {}...", piece_name.to_lowercase());
+        println!("With movement vectors: {:?}", sliding_piece.directions);
+        println!(
+            "pub const {}_MAGICS: &[MagicEntry; Square::NUM] = &[",
+            piece_name.to_uppercase()
+        );
         let mut table_length = 0;
         for square in 0..64 {
             let square = Square::new(square);
@@ -172,8 +182,8 @@ pub fn precompute_magics(
             let (magic_entry, magics) = compute_magic(sliding_piece, square, blockers_amount, rng_instance);
 
             println!(
-                "    MagicEntry {{ mask: 0x{:016X}, magic: 0x{:016X}, shift: {}, offset: {} }},",
-                magic_entry.mask.0, magic_entry.magic, magic_entry.shift, table_length
+                "    MagicEntry {{ square: {}, mask: 0x{:016X}, magic: 0x{:016X}, shift: {}, offset: {} }},",
+                square.0, magic_entry.mask.0, magic_entry.magic, magic_entry.shift, table_length
             );
             table_length += magics.len();
         }

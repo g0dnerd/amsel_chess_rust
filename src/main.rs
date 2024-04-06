@@ -46,5 +46,6 @@ fn main() {
 
     // Tests the magics precomputation
     let mut rng = amsel_chess_rust::rng::Rng::default();
-    amsel_chess_rust::precompute::precompute_magics(&amsel_chess_rust::precompute::ROOK, "Rook", &mut rng);
+    amsel_chess_rust::precompute::precompute_magics(&amsel_chess_rust::precompute::BISHOP, "Bishop", &mut rng);
+    print!("Success!");
 }

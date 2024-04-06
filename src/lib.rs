@@ -6,9 +6,6 @@ mod state;
 pub mod rng;
 pub mod precompute;
 
-// mod game;
-// mod piece;
-
 /* Represents a single square on the board.
 / Representation: 0-63, with 0 being a1 and 63 being h8. */
 #[derive(Debug, Clone, Copy, Hash, Eq, PartialEq)]
@@ -20,17 +17,30 @@ impl Square {
     }
 
     /* Attempt to offset the square by a given delta.
-    / If the new square is out of bounds, return None. */
+    / If the new square is out of bounds OR on the edge of the board, return None. */
     pub fn offset(&self, file_offset: i8, rank_offset: i8) -> Option<Square> {
-        let file = self.0 % 8;
-        let rank = self.0 / 8;
-        let new_file = file as i8 + file_offset;
-        let new_rank = rank as i8 + rank_offset;
-        if new_file < 0 || new_file > 7 || new_rank < 0 || new_rank > 7 {
-            None
-        } else {
-            Some(Square((new_rank as usize) * 8 + new_file as usize))
+       let new_index = self.0 as i8 + file_offset + 8 * rank_offset;
+       // Check if the new index overflows between ranks or files
+        if self.0 < 8 && rank_offset == -1 {
+        return None;
         }
+        if self.0 >= 56 && rank_offset == 1 {
+        return None;
+        }
+        if self.0 % 8 == 0 && file_offset == -1 {
+            return None;
+        }
+        if self.0 % 8 == 7 && file_offset == 1 {
+            return None;
+        }
+       if file_offset != 0 && rank_offset == 0 && new_index / 8 != self.0 as i8 / 8 {
+        return None;
+       }
+       if  new_index < 0 || new_index > 63 {
+           None
+       } else {
+        Some(Square(new_index as usize))
+       }
     }
 }
 
