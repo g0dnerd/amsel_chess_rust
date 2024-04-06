@@ -86,7 +86,7 @@ impl Position {
         
         let piece = if let Some(piece_index) = 
             (0..=5).find(|&i| self.piece_boards[i].0 & mask != 0) {
-                
+
             match piece_index {
                 0 => Pieces::ROOK,
                 1 => Pieces::KNIGHT,
@@ -183,11 +183,9 @@ impl Position {
 
     pub fn get_queen_moves(&self, origin: &Square) -> BitBoard {
         let rook_moves = self.get_rook_moves(origin);
-        let bishop_moves = self.get_bishop_moves(origin);
+        let bishop_moves = self.get_bishop_moves(origin); 
         let queen_moves = rook_moves | bishop_moves;
         queen_moves
     }
-
-    // TODO: Pawn moves
 
 }
