@@ -30,9 +30,9 @@ impl SlidingPiece {
             /  3. Loop terminates if that new square is in the list of blockers.
             /  4. If not, square gets added to legal moves. */
             while !blockers.contains(ray) {
-                if let Some(offset_by_delta) = ray.offset(dx, dy) {
+                if let Some(offset_by_delta) = ray.try_offset(dx, dy) {
                     ray = offset_by_delta;
-                    moves |= BitBoard::from_index(ray.0);
+                    moves |= BitBoard::from_square(ray);
                 } else {
                     break;
                 }
@@ -53,12 +53,12 @@ impl SlidingPiece {
         /  4. XOR square and the blocker BitBoard together. */
         for &(dx, dy) in &self.directions {
             let mut ray = square;
-            while let Some(offset_by_delta) = ray.offset(dx, dy) {
-                blockers |= BitBoard::from_index(ray.0);
+            while let Some(offset_by_delta) = ray.try_offset(dx, dy) {
+                blockers |= BitBoard::from_square(ray);
                 ray = offset_by_delta;
             }
         }
-        blockers &= !BitBoard::from_index(square.0);
+        blockers &= !BitBoard::from_square(square);
         blockers
     }
     
@@ -172,7 +172,7 @@ fn attempt_magics(
 // Precompute and save magics for all slider piece.
 pub fn precompute_magics(
     rng_instance: &mut Rng) -> Result<(), Error> {
-        let path = "./engine/src/magics.rs";
+        let path = "magics.rs";
         println!("Precomputing magics in path {}", path);
         std::fs::remove_file(path).ok();
         let mut output_file = File::create(path)?;
@@ -194,8 +194,7 @@ pub fn precompute_magics(
             );
             write!(output_file, "{}\n", line)?;
             let mut table_length = 0;
-            for square in 0..64 {
-                let square = Square::new(square);
+            for square in Square::ALL {
                 let blockers_amount = sliding_piece.blocker_squares(square).count_ones() as u8;
                 let (magic_entry, magics) = compute_magic(sliding_piece, square, blockers_amount, rng_instance);
 
@@ -204,7 +203,7 @@ pub fn precompute_magics(
                     magic_entry.mask.0, magic_entry.magic, magic_entry.shift, table_length
                 );
                 write!(output_file, "{}\n", line)?;
-                print!("\rEntry {} of 64 written to file.", square.0 + 1);
+                print!("\rEntry {} of 64 written to file.", square as usize + 1);
                 io::stdout().flush().unwrap();
                 table_length += magics.len();
             }

@@ -54,11 +54,11 @@ impl Position {
     // Prints out a visual representation of a given board state.
     pub fn print_position(&self) {
         let mut board = [[0; 8]; 8];
-        for i in 0..64 {
-            match self.piece_at(&Square(i)) {
+        for square in Square::ALL {
+            match self.piece_at(square) {
                 Some((piece, color)) => {
-                    let x = i % 8;
-                    let y = i / 8;
+                    let x = square as usize % 8;
+                    let y = square as usize / 8;
                     board[y][x] = match color {
                         Color::White => piece + 1,
                         Color::Black => piece + 7,
@@ -76,8 +76,8 @@ impl Position {
     }
 
     // Returns the piece at a given square or None if the square is empty
-    pub fn piece_at(&self, square: &Square) -> Option<(u8, Color)> {
-        let index = square.0;
+    pub fn piece_at(&self, square: Square) -> Option<(u8, Color)> {
+        let index = square as usize;
         let mask: u64 = 1 << index;
         let color_mask = if self.color_bitboards[0].0 & mask != 0 {
             Color::White
@@ -104,16 +104,16 @@ impl Position {
         Some((piece, color_mask))
     }
 
-    pub fn get_legal_moves_by_square(&self, _from: Square) -> BitBoard {
-        match self.piece_at(&_from) {
-            Some((Pieces::ROOK, Color::White)) => self.get_rook_moves(&_from),
-            Some((Pieces::ROOK, Color::Black)) => self.get_rook_moves(&_from),
-            Some((Pieces::KNIGHT, Color::White)) => self.get_knight_moves(&_from),
-            Some((Pieces::KNIGHT, Color::Black)) => self.get_knight_moves(&_from),
-            Some((Pieces::BISHOP, Color::White)) => self.get_bishop_moves(&_from),
-            Some((Pieces::BISHOP, Color::Black)) => self.get_bishop_moves(&_from),
-            Some((Pieces::QUEEN, Color::White)) => self.get_queen_moves(&_from),
-            Some((Pieces::QUEEN, Color::Black)) => self.get_queen_moves(&_from),
+    /* pub fn get_legal_moves_by_square(&self, _from: Square) -> BitBoard {
+        match self.piece_at(_from) {
+            Some((Pieces::ROOK, Color::White)) => self.get_rook_moves(_from),
+            Some((Pieces::ROOK, Color::Black)) => self.get_rook_moves(_from),
+            Some((Pieces::KNIGHT, Color::White)) => self.get_knight_moves(_from),
+            Some((Pieces::KNIGHT, Color::Black)) => self.get_knight_moves(_from),
+            Some((Pieces::BISHOP, Color::White)) => self.get_bishop_moves(_from),
+            Some((Pieces::BISHOP, Color::Black)) => self.get_bishop_moves(_from),
+            Some((Pieces::QUEEN, Color::White)) => self.get_queen_moves(_from),
+            Some((Pieces::QUEEN, Color::Black)) => self.get_queen_moves(_from),
             /* Some((Pieces::KING, Color::White)) => self.get_king_moves(_from),
             Some((Pieces::KING, Color::Black)) => self.get_king_moves(_from),
             Some((Pieces::PAWN, Color::White)) => self.get_pawn_moves(_from),
@@ -130,9 +130,9 @@ impl Position {
         - consider pins (should that be done here or in the move generation?)
      */
 
-    pub fn get_rook_moves(&self, origin: &Square) -> BitBoard {
+    pub fn get_rook_moves(&self, origin: Square) -> BitBoard {
             
-            let square_bb = BitBoard::from_index(origin.0);
+            let square_bb = BitBoard::from_index(origin as usize);
             let mut rook_moves = BitBoard::empty();
     
             // Calculate all possible rook moves relative to the current square
@@ -146,9 +146,9 @@ impl Position {
             rook_moves /*& not_occupied*/
     }
 
-    pub fn get_knight_moves(&self, origin: &Square) -> BitBoard {
+    pub fn get_knight_moves(&self, origin: Square) -> BitBoard {
         
-        let square_bb = BitBoard::from_index(origin.0);
+        let square_bb = BitBoard::from_index(origin as usize);
         let mut knight_moves = BitBoard::empty();
 
         knight_moves |= square_bb.shift_east() << 16;
@@ -165,10 +165,10 @@ impl Position {
         knight_moves & not_occupied
     }
 
-    pub fn get_bishop_moves(&self, origin: &Square) -> BitBoard {
+    pub fn get_bishop_moves(&self, origin: Square) -> BitBoard {
     
         // Calculate bishop moves relative to the current square
-        let square_bb = BitBoard::from_index(origin.0);
+        let square_bb = BitBoard::from_index(origin as usize);
         let mut bishop_moves = BitBoard::empty();
     
         // Calculate all possible bishop moves relative to the current square
@@ -182,11 +182,11 @@ impl Position {
         bishop_moves & not_occupied
     }
 
-    pub fn get_queen_moves(&self, origin: &Square) -> BitBoard {
+    pub fn get_queen_moves(&self, origin: Square) -> BitBoard {
         let rook_moves = self.get_rook_moves(origin);
         let bishop_moves = self.get_bishop_moves(origin); 
         let queen_moves = rook_moves | bishop_moves;
         queen_moves
-    }
+    } */
 
 }

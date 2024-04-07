@@ -82,6 +82,10 @@ impl BitBoard {
         Self(u)
     }
 
+    pub fn from_square(square: Square) -> Self {
+        Self(1 << square as usize)
+    }
+
     pub fn from_index(index: usize) -> Self {
         assert!(index < 64, "Index out of bounds");
         Self(1 << index)
@@ -96,7 +100,7 @@ impl BitBoard {
     }
 
     pub fn contains(self, square: Square) -> bool {
-        !(self & BitBoard::from_index(square.0)).is_empty()
+        !(self & BitBoard::from_index(square as usize)).is_empty()
     }
 
     pub fn shift_east(&self) -> Self {

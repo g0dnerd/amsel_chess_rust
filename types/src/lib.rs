@@ -3,54 +3,10 @@ use std::ops::Not;
 pub mod bitboard;
 pub mod position;
 pub mod state;
+pub mod square;
 
 /* Represents a single square on the board.
 / Representation: 0-63, with 0 being a1 and 63 being h8. */
-pub mod square {    
-    #[derive(Debug, Clone, Copy, Hash, Eq, PartialEq)]
-    pub struct Square(pub usize);
-
-    impl Square {
-        pub fn new(index: usize) -> Self {
-            Self(index)
-        }
-
-        /* Attempt to offset the square by a given delta.
-        / If the new square is out of bounds OR on the edge of the board, return None. */
-        pub fn offset(&self, file_offset: i8, rank_offset: i8) -> Option<Square> {
-        let new_index = self.0 as i8 + file_offset + 8 * rank_offset;
-        // Check if the new index overflows between ranks or files
-            if self.0 < 8 && rank_offset == -1 {
-            return None;
-            }
-            if self.0 >= 56 && rank_offset == 1 {
-            return None;
-            }
-            if self.0 % 8 == 0 && file_offset == -1 {
-                return None;
-            }
-            if self.0 % 8 == 7 && file_offset == 1 {
-                return None;
-            }
-        if file_offset != 0 && rank_offset == 0 && new_index / 8 != self.0 as i8 / 8 {
-            return None;
-        }
-        if  new_index < 0 || new_index > 63 {
-            None
-        } else {
-            Some(Square(new_index as usize))
-        }
-        }
-    }
-
-    pub fn get_printable_square_from_index(index: &usize) -> String {
-        let file = index % 8;
-        let rank = index / 8;
-        let file_char = (file as u8 + 97) as char;
-        let rank_char = (rank as u8 + 49) as char;
-        format!("{}{}", file_char, rank_char)
-    }
-}
 
 #[derive(Debug, Clone, Copy, Hash, Eq, PartialEq)]
 pub enum Color {
