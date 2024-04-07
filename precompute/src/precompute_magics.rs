@@ -1,6 +1,10 @@
 use crate::rng::Rng;
 use types::bitboard::BitBoard;
 use types::square::Square;
+use std::fs::File;
+use std::io;
+use std::io::prelude::*;
+use std::io::Error;
 
 /* This module contains the logic to precompute a magic number for a given slider piece and square
 / that perfectly maps input blockers into a hash table.
@@ -8,6 +12,7 @@ use types::square::Square;
 / https://github.com/analog-hors/magic-bitboards-demo
 / licensed under the MIT License at https://spdx.org/licenses/MIT.html */
 
+#[derive(PartialEq)]
 pub struct SlidingPiece {
     directions: [(i8, i8); 4],
 }
@@ -164,32 +169,53 @@ fn attempt_magics(
     Ok(table)  
 }
 
-// Precompute and print magics for a given slider piece.
+// Precompute and save magics for all slider piece.
 pub fn precompute_magics(
-    sliding_piece: &SlidingPiece,
-    piece_name: &str,
-    rng_instance: &mut Rng) {
-        println!("Computing magics for {}...", piece_name.to_lowercase());
-        println!("With movement vectors: {:?}", sliding_piece.directions);
-        println!(
-            "pub const {}_MAGICS: &[MagicEntry; Square::NUM] = &[",
-            piece_name.to_uppercase()
-        );
-        let mut table_length = 0;
-        for square in 0..64 {
-            let square = Square::new(square);
-            let blockers_amount = sliding_piece.blocker_squares(square).count_ones() as u8;
-            let (magic_entry, magics) = compute_magic(sliding_piece, square, blockers_amount, rng_instance);
-
-            println!(
-                "    MagicEntry {{ square: {}, mask: 0x{:016X}, magic: 0x{:016X}, shift: {}, offset: {} }},",
-                square.0, magic_entry.mask.0, magic_entry.magic, magic_entry.shift, table_length
+    rng_instance: &mut Rng) -> Result<(), Error> {
+        let path = "./engine/src/magics.rs";
+        println!("Precomputing magics in path {}", path);
+        std::fs::remove_file(path).ok();
+        let mut output_file = File::create(path)?;
+        let line = "use types::*;\n";
+        write!(output_file, "{}\n", line)?;
+        let line = "pub struct MagicEntry {
+            pub mask: u64,
+            pub magic: u64,
+            pub shift: u8,
+            pub offset: u32,
+        }\n";
+        write!(output_file, "{}\n", line)?;
+        for sliding_piece in &[ROOK, BISHOP] {
+            let piece_name = if sliding_piece == &ROOK { "rook" } else { "bishop" };
+            println!("\nComputing magics for {}", piece_name);
+            let line = format!(
+                "pub const {}_MAGICS: &[MagicEntry; Square::NUM] = &[",
+                piece_name.to_uppercase()
             );
-            table_length += magics.len();
+            write!(output_file, "{}\n", line)?;
+            let mut table_length = 0;
+            for square in 0..64 {
+                let square = Square::new(square);
+                let blockers_amount = sliding_piece.blocker_squares(square).count_ones() as u8;
+                let (magic_entry, magics) = compute_magic(sliding_piece, square, blockers_amount, rng_instance);
+
+                let line = format!(
+                    "    MagicEntry {{ mask: 0x{:016X}, magic: 0x{:016X}, shift: {}, offset: {} }},",
+                    magic_entry.mask.0, magic_entry.magic, magic_entry.shift, table_length
+                );
+                write!(output_file, "{}\n", line)?;
+                print!("\rEntry {} of 64 written to file.", square.0 + 1);
+                io::stdout().flush().unwrap();
+                table_length += magics.len();
+            }
+
+            let line = format!("];");
+            write!(output_file, "{}\n", line)?;
+            let line = format!(
+                "pub const {}_TABLE_SIZE: usize = {};",
+                piece_name.to_uppercase(), table_length
+            );
+            write!(output_file, "{}\n\n", line)?;
         }
-        println!("];");
-        println!(
-            "pub const {}_TABLE_SIZE: usize = {};",
-            piece_name.to_uppercase(), table_length
-        );
+        Ok(())
 }
