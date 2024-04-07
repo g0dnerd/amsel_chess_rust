@@ -37,7 +37,7 @@ pub fn get_rook_moves_from_position(square: Square, position: &Position) -> BitB
 
     // Remove all moves that would capture a piece of the same color
     let color = position.piece_at(square).unwrap().1;
-    moves = moves & position.color_bitboards[color as usize];
+    moves = moves & !position.color_bitboards[color as usize];
     moves
 }
 
@@ -55,7 +55,7 @@ pub fn get_bishop_moves_from_position(square: Square, position: &Position) -> Bi
 
     // Remove all moves that would capture a piece of the same color
     let color = position.piece_at(square).unwrap().1;
-    moves = moves & position.color_bitboards[color as usize];
+    moves = moves & !position.color_bitboards[color as usize];
     moves
 }
 
@@ -71,4 +71,28 @@ pub fn get_queen_moves_from_position(square: Square, position: &Position) -> Bit
 
 pub fn get_queen_moves_from_blockers(square: Square, blockers: BitBoard) -> BitBoard {
     get_rook_moves_from_blockers(square, blockers) | get_bishop_moves_from_blockers(square, blockers)
+}
+
+pub fn get_knight_moves(square: Square, position: &Position) -> BitBoard {
+    let mut moves = BitBoard::empty();
+    for &(dx, dy) in &[(1, 2), (2, 1), (1, -2), (2, -1), (-1, 2), (-2, 1), (-1, -2), (-2, -1)] {
+        if let Some(offset_by_delta) = square.try_offset(dx, dy) {
+            moves |= BitBoard::from_square(offset_by_delta);
+        }
+    }
+    let color = position.piece_at(square).unwrap().1;
+    moves = moves & !position.color_bitboards[color as usize];
+    moves
+}
+
+pub fn get_king_moves(square: Square, position: &Position) -> BitBoard {
+    let mut moves = BitBoard::empty();
+    for &(dx, dy) in &[(1, 1), (1, 0), (1, -1), (0, 1), (0, -1), (-1, 1), (-1, 0), (-1, -1)] {
+        if let Some(offset_by_delta) = square.try_offset(dx, dy) {
+            moves |= BitBoard::from_square(offset_by_delta);
+        }
+    }
+    let color = position.piece_at(square).unwrap().1;
+    moves = moves & !position.color_bitboards[color as usize];
+    moves
 }
