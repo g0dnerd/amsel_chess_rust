@@ -10,7 +10,6 @@ You can specify the binary to run by using `cargo run --bin binary-name`.
 * uses precalculated magic bitboards to aid search efficiency
 
 ## ToDos
-* refactor square Struct from using indices to an enum to allow for better performance when offsetting
-* save precomputation outputs
+* add a proper `cargo build` flow that re-precomputes magic bitboards (should this just be the build script for the main engine?)
 
 ## Known issues
