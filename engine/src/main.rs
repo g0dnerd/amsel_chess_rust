@@ -3,9 +3,10 @@ use types::position::Position;
 
 fn main() {
     env::set_var("RUST_BACKTRACE", "1");
-    let test_pos = Position::new();
-
+    
     // Tests the board's print method
+    // TODO: How can I move this into a unit test?
+    let test_pos = Position::new();
     test_pos.print_position();
 
 }
@@ -63,5 +64,17 @@ mod tests {
         let square = Square::E1;
         let moves = movegen::get_king_moves(square, &test_pos);
         assert_eq!(moves, BitBoard::empty());
+    }
+
+    #[test]
+    #[should_panic(expected = "called on empty square")]
+    fn moves_empty_square() {
+        let test_pos = Position::new();
+        let square = Square::D4;
+        let _moves = (movegen::get_king_moves(square, &test_pos),
+                     movegen::get_queen_moves_from_position(square, &test_pos),
+                     movegen::get_bishop_moves_from_position(square, &test_pos),
+                     movegen::get_knight_moves(square, &test_pos),
+                     movegen::get_rook_moves_from_position(square, &test_pos));
     }
 }

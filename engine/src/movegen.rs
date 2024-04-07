@@ -30,6 +30,14 @@ fn magic_index(entry: &MagicTableEntry, blockers: BitBoard) -> usize {
 }
 
 pub fn get_rook_moves_from_position(square: Square, position: &Position) -> BitBoard {
+    
+    // Handle potential errors when trying to unwrap a piece from an empty square
+    let piece = position.piece_at(square);
+    match piece {
+        None => panic!("get_king_moves called on empty square"),
+        _ => ()
+    }
+    
     let blockers = get_actual_blockers(&ROOK.directions, square, position);
     let magic_entry = &ROOK_MAGICS[square as usize];
     let index = magic_index(magic_entry, blockers);
@@ -48,6 +56,14 @@ pub fn get_rook_moves_from_blockers(square: Square, blockers: BitBoard) -> BitBo
 }
 
 pub fn get_bishop_moves_from_position(square: Square, position: &Position) -> BitBoard {
+    
+    // Handle potential errors when trying to unwrap a piece from an empty square
+    let piece = position.piece_at(square);
+    match piece {
+        None => panic!("get_king_moves called on empty square"),
+        _ => ()
+    }
+
     let blockers = get_actual_blockers(&BISHOP.directions, square, position);
     let magic_entry = &BISHOP_MAGICS[square as usize];
     let index = magic_index(magic_entry, blockers);
@@ -74,6 +90,13 @@ pub fn get_queen_moves_from_blockers(square: Square, blockers: BitBoard) -> BitB
 }
 
 pub fn get_knight_moves(square: Square, position: &Position) -> BitBoard {
+
+    // Handle potential errors when trying to unwrap a piece from an empty square
+    let piece = position.piece_at(square);
+    match piece {
+        None => panic!("get_king_moves called on empty square"),
+        _ => ()
+    }
     let mut moves = BitBoard::empty();
     for &(dx, dy) in &[(1, 2), (2, 1), (1, -2), (2, -1), (-1, 2), (-2, 1), (-1, -2), (-2, -1)] {
         if let Some(offset_by_delta) = square.try_offset(dx, dy) {
@@ -86,12 +109,23 @@ pub fn get_knight_moves(square: Square, position: &Position) -> BitBoard {
 }
 
 pub fn get_king_moves(square: Square, position: &Position) -> BitBoard {
+
+    // Handle potential errors when trying to unwrap a piece from an empty square
+    let piece = position.piece_at(square);
+    match piece {
+        None => panic!("get_king_moves called on empty square"),
+        _ => ()
+    }
+
     let mut moves = BitBoard::empty();
     for &(dx, dy) in &[(1, 1), (1, 0), (1, -1), (0, 1), (0, -1), (-1, 1), (-1, 0), (-1, -1)] {
         if let Some(offset_by_delta) = square.try_offset(dx, dy) {
             moves |= BitBoard::from_square(offset_by_delta);
         }
     }
+
+    // Handle potential errors when trying to unwrap a piece from an empty square
+
     let color = position.piece_at(square).unwrap().1;
     moves = moves & !position.color_bitboards[color as usize];
     moves
