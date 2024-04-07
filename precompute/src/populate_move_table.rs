@@ -55,7 +55,7 @@ pub fn make_table(
 }
 
 pub fn write_table(name: &str, table: &[BitBoard], out: &mut impl Write) -> std::io::Result<()> {
-    write!(out, "const {}_MOVES: &[u64; {}] = &[", name, table.len())?;
+    write!(out, "pub const {}_MOVES: &[u64; {}] = &[", name, table.len())?;
     for entry in table {
         write!(out, "{},", entry.0)?;
     }
@@ -70,7 +70,7 @@ pub fn write_magics(
 ) -> std::io::Result<()> {
     write!(
         out,
-        "const {}_MAGICS: &[MagicEntry; Square::NUM] = &[",
+        "pub const {}_MAGICS: &[MagicEntry; Square::NUM] = &[",
         name
     )?;
     for entry in magics {
