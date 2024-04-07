@@ -21,6 +21,10 @@ impl State {
             active_player: Color::White,
         }
     }
+
+    pub fn switch_active_player(&mut self) {
+        self.active_player = !self.active_player;
+    }
 }
 
 /* For performance reasons, we will use a single u8 to represent the castling rights:

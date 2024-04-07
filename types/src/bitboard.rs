@@ -131,20 +131,15 @@ impl BitBoard {
         Self((self.0 & 0x7F7F_7F7F_7F7F_7F7F) >> 9)
     }
 
-    pub fn squares_from_bb(&self) -> Vec<usize> {
+    pub fn squares_from_bb(&self) -> Vec<Square> {
         let mut squares = Vec::new();
         let mut bb = self.0;
         while bb != 0 {
-            let square = bb.trailing_zeros() as usize;
+            let square = Square::index(bb.trailing_zeros() as usize);
             squares.push(square);
             bb &= bb - 1;
         }
         squares
     }
-
-    // Returns whether the BitBoard is empty
-    /* pub fn is_empty(&self) -> bool {
-        self.0 == 0
-    } */
 
 } 

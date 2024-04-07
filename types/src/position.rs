@@ -12,7 +12,7 @@ pub struct Position {
     pub color_bitboards: [BitBoard; 2],
 
     // Array of BitBoards, one for each piece type
-    piece_boards: [BitBoard; 6],
+    pub piece_boards: [BitBoard; 6],
 
     state: State,
 }
@@ -111,5 +111,9 @@ impl Position {
 
     pub fn all_pieces(&self) -> BitBoard {
         self.color_bitboards[0] | self.color_bitboards[1]
+    }
+
+    pub fn is_in_check(&self) -> bool {
+        todo!()
     }
 }

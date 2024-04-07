@@ -77,6 +77,14 @@ impl Square {
         File::index(self as usize & 0b000111)
     }
 
+    pub fn file_index(self) -> usize {
+        self as usize % 8
+    }
+
+    pub fn rank_index(self) -> usize {
+        self as usize / 8
+    }
+
     pub fn rank(self) -> Rank {
         Rank::index(self as usize >> 3)
     }
