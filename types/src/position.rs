@@ -9,7 +9,7 @@ use crate::state::State;
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub struct Position {
     // Array of two BitBoards, one for each side
-    color_bitboards: [BitBoard; 2],
+    pub color_bitboards: [BitBoard; 2],
 
     // Array of BitBoards, one for each piece type
     piece_boards: [BitBoard; 6],
@@ -42,6 +42,11 @@ impl Position {
         piece_boards[4] = BitBoard::from_u64(0b1000000000000000000000000000000000000000000000000000000010000);
         // Pawns
         piece_boards[5] = BitBoard::from_u64(0b11111111000000000000000000000000000000001111111100000000);
+
+        // Check if the color bitboards match the piece bitboards
+        assert_eq!(bitboards[0] | bitboards[1],
+            piece_boards[0] | piece_boards[1] | piece_boards[2] | piece_boards[3] | piece_boards[4] | piece_boards[5],
+            "Inconsistent position initialization. Color bitboards do not match piece bitboards.");
 
         Self {
             color_bitboards: bitboards,
@@ -104,89 +109,7 @@ impl Position {
         Some((piece, color_mask))
     }
 
-    /* pub fn get_legal_moves_by_square(&self, _from: Square) -> BitBoard {
-        match self.piece_at(_from) {
-            Some((Pieces::ROOK, Color::White)) => self.get_rook_moves(_from),
-            Some((Pieces::ROOK, Color::Black)) => self.get_rook_moves(_from),
-            Some((Pieces::KNIGHT, Color::White)) => self.get_knight_moves(_from),
-            Some((Pieces::KNIGHT, Color::Black)) => self.get_knight_moves(_from),
-            Some((Pieces::BISHOP, Color::White)) => self.get_bishop_moves(_from),
-            Some((Pieces::BISHOP, Color::Black)) => self.get_bishop_moves(_from),
-            Some((Pieces::QUEEN, Color::White)) => self.get_queen_moves(_from),
-            Some((Pieces::QUEEN, Color::Black)) => self.get_queen_moves(_from),
-            /* Some((Pieces::KING, Color::White)) => self.get_king_moves(_from),
-            Some((Pieces::KING, Color::Black)) => self.get_king_moves(_from),
-            Some((Pieces::PAWN, Color::White)) => self.get_pawn_moves(_from),
-            Some((Pieces::PAWN, Color::Black)) => self.get_pawn_moves(_from), */
-            _ => BitBoard::empty(),
-        }
+    pub fn all_pieces(&self) -> BitBoard {
+        self.color_bitboards[0] | self.color_bitboards[1]
     }
-
-    /* The get_xyz_moves methods use bit masks and bitwise operations to check
-    / for legal moves for each piece type. This considers blocked squares and paths
-    / as well as the board boundaries.
-    / TODOs:
-        - consider captures
-        - consider pins (should that be done here or in the move generation?)
-     */
-
-    pub fn get_rook_moves(&self, origin: Square) -> BitBoard {
-            
-            let square_bb = BitBoard::from_index(origin as usize);
-            let mut rook_moves = BitBoard::empty();
-    
-            // Calculate all possible rook moves relative to the current square
-            rook_moves |= square_bb << 8;
-            rook_moves |= square_bb >> 8;
-            rook_moves |= square_bb.shift_east();
-            rook_moves |= square_bb.shift_west();
-    
-            // Filter out moves that go off the board
-            // let not_occupied = !(self.color_bitboards[0].0 | self.color_bitboards[1].0);
-            rook_moves /*& not_occupied*/
-    }
-
-    pub fn get_knight_moves(&self, origin: Square) -> BitBoard {
-        
-        let square_bb = BitBoard::from_index(origin as usize);
-        let mut knight_moves = BitBoard::empty();
-
-        knight_moves |= square_bb.shift_east() << 16;
-        knight_moves |= square_bb.shift_west() << 16;
-        knight_moves |= square_bb.shift_east() >> 16;
-        knight_moves |= square_bb.shift_west() >> 16;
-        knight_moves |= square_bb.shift_west().shift_west() >> 8;
-        knight_moves |= square_bb.shift_west().shift_west() << 8;
-        knight_moves |= square_bb.shift_east().shift_east() >> 8;
-        knight_moves |= square_bb.shift_east().shift_east() << 8;
-
-        // Filter out moves that are blocked by occupied squares
-        let not_occupied = !(self.color_bitboards[0] | self.color_bitboards[1]);
-        knight_moves & not_occupied
-    }
-
-    pub fn get_bishop_moves(&self, origin: Square) -> BitBoard {
-    
-        // Calculate bishop moves relative to the current square
-        let square_bb = BitBoard::from_index(origin as usize);
-        let mut bishop_moves = BitBoard::empty();
-    
-        // Calculate all possible bishop moves relative to the current square
-        bishop_moves |= square_bb.diagonal_north_east();
-        bishop_moves |= square_bb.diagonal_north_west();
-        bishop_moves |= square_bb.diagonal_south_east();
-        bishop_moves |= square_bb.diagonal_south_west();
-    
-        // Filter out moves that go off the board
-        let not_occupied = !(self.color_bitboards[0] | self.color_bitboards[1]);
-        bishop_moves & not_occupied
-    }
-
-    pub fn get_queen_moves(&self, origin: Square) -> BitBoard {
-        let rook_moves = self.get_rook_moves(origin);
-        let bishop_moves = self.get_bishop_moves(origin); 
-        let queen_moves = rook_moves | bishop_moves;
-        queen_moves
-    } */
-
 }

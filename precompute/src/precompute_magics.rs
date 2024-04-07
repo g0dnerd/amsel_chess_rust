@@ -14,7 +14,7 @@ use std::io::Error;
 
 #[derive(PartialEq)]
 pub struct SlidingPiece {
-    directions: [(i8, i8); 4],
+    pub directions: [(i8, i8); 4],
 }
 
 impl SlidingPiece {

@@ -1,6 +1,6 @@
-/* use precompute::rng::Rng;
-use precompute::precompute_magics::precompute_magics; */
 use precompute::populate_move_table::{make_table, write_magics, write_table};
+use precompute::precompute_magics::precompute_magics;
+use precompute::rng::Rng;
 use std::io::Result;
 use std::env;
 
@@ -15,9 +15,8 @@ fn main() -> Result<()> {
     env::set_var("RUST_BACKTRACE", "1");
     
     // Tests the magics precomputation
-    // let mut rng = Rng::default();
-    
-    // precompute_magics(&mut rng)?;
+    let mut rng = Rng::default();
+    precompute_magics(&mut rng)?;
    
     let rook_table = precompute::populate_move_table::make_table(
         ROOK_TABLE_SIZE,
@@ -30,7 +29,8 @@ fn main() -> Result<()> {
         BISHOP_MAGICS,
     );
 
-    let mut out: PathBuf = std::env::var("OUT_DIR").unwrap().into();
+    let mut out: PathBuf = "".into();
+    out.push("engine/src/");
     out.push("magics.rs");
     let mut out = BufWriter::new(File::create(out).unwrap());
 
