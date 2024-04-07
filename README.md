@@ -11,5 +11,7 @@ You can specify the binary to run by using `cargo run --bin binary-name`.
 
 ## ToDos
 * add a proper `cargo build` flow that re-precomputes magic bitboards (should this just be the build script for the main engine?)
+* add tests
+* finish move generation (needs to check legality - requires check detection)
 
 ## Known issues

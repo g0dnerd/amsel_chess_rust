@@ -64,3 +64,11 @@ pub fn get_bishop_moves_from_blockers(square: Square, blockers: BitBoard) -> Bit
     let index = magic_index(magic_entry, blockers);
     BitBoard(BISHOP_MOVES[index])
 }
+
+pub fn get_queen_moves_from_position(square: Square, position: &Position) -> BitBoard {
+    get_rook_moves_from_position(square, position) | get_bishop_moves_from_position(square, position)
+}
+
+pub fn get_queen_moves_from_blockers(square: Square, blockers: BitBoard) -> BitBoard {
+    get_rook_moves_from_blockers(square, blockers) | get_bishop_moves_from_blockers(square, blockers)
+}
