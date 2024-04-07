@@ -10,14 +10,14 @@ pub mod square;
 
 #[derive(Debug, Clone, Copy, Hash, Eq, PartialEq)]
 pub enum Color {
-    Black,
     White,
+    Black,
 }
 impl From<bool> for Color {
     fn from(b: bool) -> Self {
         match b {
-            false => Color::White,
-            true => Color::Black,
+            false => Color::Black,
+            true => Color::White,
         }
     }
 }
