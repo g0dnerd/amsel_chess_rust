@@ -2,6 +2,7 @@ use precompute::populate_move_table::{make_table, write_magics, write_table};
 use precompute::precompute_magics::precompute_magics;
 use precompute::rng::Rng;
 use std::io::Result;
+use std::io::prelude::*;
 use std::env;
 
 use std::fs::File;
@@ -33,6 +34,9 @@ fn main() -> Result<()> {
     out.push("engine/src/");
     out.push("magics.rs");
     let mut out = BufWriter::new(File::create(out).unwrap());
+
+    write!(out, "use types::square::Square;\n")?;
+    write!(out, "use precompute::magics::MagicTableEntry;\n")?;
 
     write_magics("ROOK", ROOK_MAGICS, &mut out).unwrap();
     write_magics("BISHOP", BISHOP_MAGICS, &mut out).unwrap();
