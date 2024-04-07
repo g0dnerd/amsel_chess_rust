@@ -1,7 +1,8 @@
-use precompute::rng::Rng;
-use precompute::precompute_magics::precompute_magics;
+/* use precompute::rng::Rng;
+use precompute::precompute_magics::precompute_magics; */
 use precompute::populate_move_table::{make_table, write_magics, write_table};
 use std::io::Result;
+use std::env;
 
 use std::fs::File;
 use std::io::BufWriter;
@@ -10,11 +11,13 @@ use std::path::PathBuf;
 use precompute::magics::*;
 
 fn main() -> Result<()> {
+
+    env::set_var("RUST_BACKTRACE", "1");
     
     // Tests the magics precomputation
-    let mut rng = Rng::default();
+    // let mut rng = Rng::default();
     
-    precompute_magics(&mut rng)?;
+    // precompute_magics(&mut rng)?;
    
     let rook_table = precompute::populate_move_table::make_table(
         ROOK_TABLE_SIZE,

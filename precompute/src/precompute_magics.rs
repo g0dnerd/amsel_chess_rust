@@ -172,13 +172,13 @@ fn attempt_magics(
 // Precompute and save magics for all slider piece.
 pub fn precompute_magics(
     rng_instance: &mut Rng) -> Result<(), Error> {
-        let path = "magics.rs";
+        let path = "./precompute/src/magics.rs";
         println!("Precomputing magics in path {}", path);
         std::fs::remove_file(path).ok();
         let mut output_file = File::create(path)?;
-        let line = "use types::*;\n";
+        let line = "use types::square::Square;\n";
         write!(output_file, "{}\n", line)?;
-        let line = "pub struct MagicEntry {
+        let line = "pub struct MagicTableEntry {
             pub mask: u64,
             pub magic: u64,
             pub shift: u8,
