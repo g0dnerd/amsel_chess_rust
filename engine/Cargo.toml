@@ -12,7 +12,3 @@ precompute = { path = "../precompute" }
 [[bin]]
 name = "engine"
 path = "./src/main.rs"
-
-[[bin]]
-name = "run_precompute"
-path = "../precompute/src/main.rs"
