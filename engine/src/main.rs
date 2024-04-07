@@ -16,7 +16,9 @@ mod tests {
     use super::*;
     use types::bitboard::BitBoard;
     use types::square::Square;
+    use types::Color;
     use engine::movegen;
+    use engine::game;
 
     #[test]
     fn moves_rook_b1_initial() {
@@ -67,6 +69,30 @@ mod tests {
     }
 
     #[test]
+    fn moves_pawn_f2_initial() {
+        let test_pos = Position::new();
+        let square = Square::F2;
+        let moves = movegen::get_pawn_moves(square, &test_pos);
+        assert_eq!(moves, BitBoard::from_u64(538968064));
+    }
+
+    #[test]
+    fn moves_pawn_h7_initial() {
+        let test_pos = Position::new();
+        let square = Square::H7;
+        let moves = movegen::get_pawn_moves(square, &test_pos);
+        assert_eq!(moves, BitBoard::from_u64(141287244169216));
+    }
+
+    /* #[test]
+    fn moves_pawn_f6_artificial() {
+        let test_pos = Position::new();
+        let square = Square::F6;
+        let moves = movegen::get_pawn_moves(square, &test_pos);
+        assert_eq!(moves, BitBoard::from_u64(22517998136852480));
+    } */
+
+    #[test]
     #[should_panic(expected = "called on empty square")]
     fn moves_empty_square() {
         let test_pos = Position::new();
@@ -76,5 +102,12 @@ mod tests {
                      movegen::get_bishop_moves_from_position(square, &test_pos),
                      movegen::get_knight_moves(square, &test_pos),
                      movegen::get_rook_moves_from_position(square, &test_pos));
+    }
+
+    #[test]
+    fn check_detection_white_initial() {
+        let test_pos = Position::new();
+        let attackers = game::get_attackers_on_king(Color::White, test_pos);
+        assert_eq!(attackers, None);
     }
 }
