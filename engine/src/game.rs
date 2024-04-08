@@ -8,18 +8,6 @@ use crate::movegen;
 /* This combines a position and a state into a game structure,
 / while still aiming to keep overall complexity low. */
 
-/* pub struct Game {
-    position: Position,
-}
-
-impl Game {
-    pub fn new(position: Position) -> Self {
-        Self {
-            position,
-        }
-    }
-} */
-
 /* This double serves as a check detection - if this returns None, the king of color: Color is not in check in the given position.
 / Uses movegen to see if any piece of the opposite color could move to the king's square. */
 pub fn get_attackers_on_king(color: Color, pos: Position) -> Option<BitBoard> {
@@ -67,5 +55,16 @@ pub fn get_attackers_on_king(color: Color, pos: Position) -> Option<BitBoard> {
         None
     } else {
         Some(attackers)
+    }
+}
+
+// Checks move legality by simulating the move and checking if the king would be in check afterwards
+pub fn is_legal_move(from: Square, to: Square, pos: &Position) -> bool {
+    let color = pos.piece_at(from).unwrap().1;
+    let new_pos = pos.simulate_move(from, to);
+    if let Some(_attackers) = get_attackers_on_king(color, new_pos) {
+        false
+    } else {
+        true
     }
 }

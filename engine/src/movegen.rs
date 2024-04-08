@@ -185,3 +185,16 @@ pub fn get_pawn_moves(square: Square, position: &Position) -> BitBoard {
     }
     moves
 }
+
+pub fn get_moves_by_square(square: Square, pos: &Position) -> BitBoard {
+    let piece = pos.piece_at(square).unwrap().0;
+    match piece {
+        0 => get_rook_moves_from_position(square, pos),
+        1 => get_knight_moves(square, pos),
+        2 => get_bishop_moves_from_position(square, pos),
+        3 => get_queen_moves_from_position(square, pos),
+        4 => get_king_moves(square, pos),
+        5 => get_pawn_moves(square, pos),
+        _ => BitBoard::empty(),
+    }
+}

@@ -72,6 +72,7 @@ impl Position {
                 None => ()
             }
         }
+        println!("---------------");
         for row in board.iter().rev() {
             for square in row.iter() {
                 print!("{} ", get_piece_representation(*square as u8));
@@ -113,7 +114,31 @@ impl Position {
         self.color_bitboards[0] | self.color_bitboards[1]
     }
 
-    pub fn is_in_check(&self) -> bool {
-        todo!()
+    // Shows a given move on the board by updating the position, not considering legality
+    pub fn simulate_move(&self, from: Square, to: Square) -> Self {
+        let mut new_pos = self.clone();
+        let (piece, color) = self.piece_at(from).unwrap();
+        let piece_index = match piece {
+            Pieces::ROOK => 0,
+            Pieces::KNIGHT => 1,
+            Pieces::BISHOP => 2,
+            Pieces::QUEEN => 3,
+            Pieces::KING => 4,
+            Pieces::PAWN => 5,
+            _ => panic!("Invalid piece"),
+        };
+        let from_mask = BitBoard::from_square(from);
+        let to_mask = BitBoard::from_square(to);
+        new_pos.color_bitboards[color as usize] ^= from_mask;
+        new_pos.color_bitboards[color as usize] |= to_mask;
+        new_pos.piece_boards[piece_index] ^= from_mask;
+        new_pos.piece_boards[piece_index] |= to_mask;
+        new_pos
+    }
+
+    pub fn make_move(&mut self, from: Square, to: Square) {
+        *self = self.simulate_move(from, to);
+        self.state.switch_active_player();
+        // TODO: Increase move counter, update en passant square, update castling rights
     }
 }

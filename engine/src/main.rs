@@ -1,13 +1,31 @@
 use std::env;
 use types::position::Position;
+use types::square::Square;
+use engine::movegen;
+use engine::game;
 
 fn main() {
     env::set_var("RUST_BACKTRACE", "1");
     
     // Tests the board's print method
     // TODO: How can I move this into a unit test?
-    let test_pos = Position::new();
+    let mut test_pos = Position::new();
     test_pos.print_position();
+
+    // Fully go through the move generation and simulation flow
+    let square = Square::B1;
+    let moves = movegen::get_moves_by_square(square, &test_pos);
+    let target_square = moves.squares_from_bb()[0];
+    let legality = game::is_legal_move(square, target_square, &test_pos);
+    println!("Move from {:?} to {:?} is legal: {}", square, target_square, legality);
+    test_pos.make_move(square, target_square);
+    test_pos.print_position();
+
+    /* test_pos = test_pos.simulate_move(Square::B1, Square::C3);
+    test_pos.print_position();
+
+    test_pos = test_pos.simulate_move(Square::D7, Square::D5);
+    test_pos.print_position(); */
 
 }
 
@@ -15,9 +33,7 @@ fn main() {
 mod tests {
     use super::*;
     use types::bitboard::BitBoard;
-    use types::square::Square;
     use types::Color;
-    use engine::movegen;
     use engine::game;
 
     #[test]
@@ -110,4 +126,5 @@ mod tests {
         let attackers = game::get_attackers_on_king(Color::White, test_pos);
         assert_eq!(attackers, None);
     }
+    
 }
