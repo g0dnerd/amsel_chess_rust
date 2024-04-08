@@ -1,31 +1,43 @@
 use std::env;
 use types::position::Position;
 use types::square::Square;
-use engine::movegen;
-use engine::game;
+use engine::{game, parse_input};
 
 fn main() {
     env::set_var("RUST_BACKTRACE", "1");
-    
-    // Tests the board's print method
-    // TODO: How can I move this into a unit test?
-    let mut test_pos = Position::new();
-    test_pos.print_position();
 
-    // Fully go through the move generation and simulation flow
-    let square = Square::B1;
-    let moves = movegen::get_moves_by_square(square, &test_pos);
-    let target_square = moves.squares_from_bb()[0];
-    let legality = game::is_legal_move(square, target_square, &test_pos);
-    println!("Move from {:?} to {:?} is legal: {}", square, target_square, legality);
-    test_pos.make_move(square, target_square);
-    test_pos.print_position();
+    // Main CLI Loop
+    let mut pos = Position::new();
 
-    /* test_pos = test_pos.simulate_move(Square::B1, Square::C3);
-    test_pos.print_position();
+    while pos.state.game_result.is_ongoing() {
+        pos.print_position();
 
-    test_pos = test_pos.simulate_move(Square::D7, Square::D5);
-    test_pos.print_position(); */
+        // Get user input in the format of "a1 a2"
+        let mut input = String::new();
+        println!("Enter your move: ");
+        std::io::stdin().read_line(&mut input).unwrap();
+        let input = input.trim();
+
+        let input_legality = parse_input::user_input_to_square_index(input);
+
+        match input_legality {
+            Ok(_) => (),
+            Err(e) => {
+                println!("Error: {}", e);
+                continue;
+            }
+        }
+
+        let squares = input_legality.unwrap();
+        let square = Square::index(squares[0]);
+        let target_square = Square::index(squares[1]);
+
+        let move_legality = game::is_legal_player_move(square, target_square, &pos);
+        match move_legality {
+            Ok(_) => pos.make_move(square, target_square),
+            Err(e) => println!("Illegal move: {}", e),
+        }
+    }
 
 }
 
@@ -35,6 +47,7 @@ mod tests {
     use types::bitboard::BitBoard;
     use types::Color;
     use engine::game;
+    use engine::movegen;
 
     #[test]
     fn moves_rook_b1_initial() {
