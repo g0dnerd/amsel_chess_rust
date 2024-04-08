@@ -31,11 +31,14 @@ impl Not for Color {
     }
 }
 
-pub enum GameResult {
-    Ongoing,
-    Checkmate,
-    Stalemate,
-    Draw,
+pub struct Results;
+
+impl Results {
+    pub const ONGOING: u8 = 0b00010000;
+    pub const DRAW: u8 = 0b00001000;
+    pub const WHITE_VICTORY: u8 = 0b00000100;
+    pub const BLACK_VICTORY: u8 = 0b00000010;
+    pub const STALEMATE: u8 = 0b00000001;
 }
 
 // Provides the index for each piece type

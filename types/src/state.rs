@@ -1,4 +1,4 @@
-use crate::{Color, Castling};
+use crate::{Color, Castling, Results};
 use crate::square::Square;
 
 /* A state depicts additional information that is necessary to evaluate a position:
@@ -6,10 +6,11 @@ use crate::square::Square;
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq)]
 pub struct State {
-    castling_rights: CastlingRights,
-    en_passant_square: Option<Square>,
-    half_move_counter: u8,
-    active_player: Color,
+    pub castling_rights: CastlingRights,
+    pub en_passant_square: Option<Square>,
+    pub half_move_counter: u8,
+    pub active_player: Color,
+    pub game_result: GameResult,
 }
 
 impl State {
@@ -19,11 +20,39 @@ impl State {
             en_passant_square: None,
             half_move_counter: 0,
             active_player: Color::White,
+            game_result: GameResult::new(),
         }
     }
 
     pub fn switch_active_player(&mut self) {
         self.active_player = !self.active_player;
+    }
+}
+
+/* Game result is stored in a u8:
+/ The first 3 bits are unused,
+/ bit 4 is ongoing,
+/ bit 5 is a draw,
+/ bit 6 is white's victory,
+/ bit 7 is black's victory and
+/ bit 8 is a stalemate.
+*/
+#[derive(Debug, Clone, Copy, Hash, Eq, PartialEq)]
+pub struct GameResult(u8);
+
+impl GameResult {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn is_ongoing(self) -> bool {
+        self == GameResult(Results::ONGOING)
+    }
+}
+
+impl Default for GameResult {
+    fn default() -> Self {
+        Self(Results::ONGOING)
     }
 }
 
@@ -37,9 +66,6 @@ impl State {
 pub struct CastlingRights(u8);
 
 impl CastlingRights {
-    /* fn empty() -> Self {
-        Self(Castling::NO_CASTLING)
-    } */
     fn all() -> Self {
         Self::default()
     }

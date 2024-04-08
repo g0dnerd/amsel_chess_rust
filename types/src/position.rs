@@ -14,7 +14,7 @@ pub struct Position {
     // Array of BitBoards, one for each piece type
     pub piece_boards: [BitBoard; 6],
 
-    state: State,
+    pub state: State,
 }
 
 impl Position {
@@ -138,6 +138,7 @@ impl Position {
 
     pub fn make_move(&mut self, from: Square, to: Square) {
         *self = self.simulate_move(from, to);
+        println!("Moved from {:?} to {:?}", from, to);
         self.state.switch_active_player();
         // TODO: Increase move counter, update en passant square, update castling rights
     }
