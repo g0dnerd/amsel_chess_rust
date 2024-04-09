@@ -45,7 +45,10 @@ fn main() {
                 pos.make_move(&square, &target_square);
                 game::update_attacked_squares(&mut pos);
             },
-            Err(e) => println!("Illegal move: {}", e),
+            Err(e) => {
+                println!("Illegal move: {}", e);
+                continue;
+            }
         }
 
         // Make a random move for the AI
