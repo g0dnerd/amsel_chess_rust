@@ -346,10 +346,6 @@ pub fn get_all_legal_moves_for_color(color: Color, pos: &Position) -> HashMap<Sq
     // Iterate over all moves and remove those that would put or leave the king in check
     let mut moves_to_remove: Vec<Square> = Vec::new();
     for (square, piece_moves) in moves.iter_mut() {
-        if piece_moves.is_empty() {
-            moves_to_remove.push(*square);
-            continue;
-        }
         let squares = piece_moves.squares_from_bb();
         for target_square in squares {
             let mut new_pos = pos.clone();
@@ -372,7 +368,14 @@ pub fn get_all_legal_moves_for_color(color: Color, pos: &Position) -> HashMap<Sq
                 }
             }
         }
-
+        if piece_moves.is_empty() {
+            moves_to_remove.push(*square);
+            continue;
+        }
+    }
+    // Remove all entries that have no legal moves
+    for square in moves_to_remove {
+        moves.remove(&square);
     }
 
     moves

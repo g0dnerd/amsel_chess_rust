@@ -64,13 +64,3 @@ pub fn is_legal_move(from: Square, to: Square, pos: &Position) -> Result<(), Str
         Err("This move is not possible for the selected piece!".to_string())
     }
 }
-
-/* pub fn would_put_player_in_check(from: Square, to: Square, pos: &Position) -> bool {
-    let new_pos = pos.simulate_move(from, to);
-    let color = pos.piece_at(from).unwrap().1;
-    if let Some(_attackers) = get_attackers_on_king(color, &new_pos) {
-        true
-    } else {
-        false
-    }
-} */
