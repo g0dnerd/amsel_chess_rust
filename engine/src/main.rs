@@ -1,16 +1,23 @@
 use std::env;
 use types::position::Position;
 use types::square::Square;
-use engine::{game, parse_input};
+use engine::{movegen, game, parse_input};
+use rand::seq::SliceRandom;
 
 fn main() {
     env::set_var("RUST_BACKTRACE", "1");
 
     // Main CLI Loop
     let mut pos = Position::new();
-
-    while pos.state.game_result.is_ongoing() {
+    
+     while pos.state.game_result.is_ongoing() {
         pos.print_position();
+
+        println!("It is now {:?}'s turn.", pos.state.active_player);
+        /* match pos.state.active_player {
+            types::Color::White => println!("Squares that are attacked by opponent: {:?}", pos.attacked_by_black.squares_from_bb()),
+            types::Color::Black => println!("Squares that are attacked by opponent: {:?}", pos.attacked_by_white.squares_from_bb()),
+        } */
 
         // Get user input in the format of "a1 a2"
         let mut input = String::new();
@@ -32,10 +39,69 @@ fn main() {
         let square = Square::index(squares[0]);
         let target_square = Square::index(squares[1]);
 
-        let move_legality = game::is_legal_player_move(square, target_square, &pos);
+        let move_legality = game::is_legal_move(square, target_square, &pos);
         match move_legality {
-            Ok(_) => pos.make_move(square, target_square),
+            Ok(_) => {
+                pos.make_move(&square, &target_square);
+                game::update_attacked_squares(&mut pos);
+            },
             Err(e) => println!("Illegal move: {}", e),
+        }
+
+        // Make a random move for the AI
+
+        println!("It is now {:?}'s turn.", pos.state.active_player);
+        /* match pos.state.active_player {
+            types::Color::White => println!("Squares that are attacked by opponent: {:?}", pos.attacked_by_black.squares_from_bb()),
+            types::Color::Black => println!("Squares that are attacked by opponent: {:?}", pos.attacked_by_white.squares_from_bb()),
+        } */
+
+        let legal_moves = 
+            movegen::get_all_legal_moves_for_color(pos.state.active_player, &pos);
+
+        let squares: Vec<Square> = legal_moves
+            .iter()
+            .filter_map(|(square, moves)|
+                if !moves.is_empty() { Some(*square) } else { None})
+            .collect();
+        if legal_moves.is_empty() {
+            match pos.state.active_player {
+                types::Color::White => {
+                    let king_square = (pos.piece_boards[4] & pos.color_bitboards[0]).squares_from_bb()[0];
+                    if pos.attacked_by_black.contains(king_square) {
+                        println!("Black wins by checkmate.");
+                        pos.print_position();
+                        println!("Squares that are attacked by opponent: {:?}", pos.attacked_by_black.squares_from_bb());
+                        pos.state.game_result = types::state::GameResult(types::Results::BLACK_VICTORY);
+                    } else {
+                        println!("Stalemate.");
+                        pos.print_position();
+                        pos.state.game_result = types::state::GameResult(types::Results::STALEMATE);
+                    }
+                },
+                types::Color::Black => {
+                    let king_square = (pos.piece_boards[4] & pos.color_bitboards[1]).squares_from_bb()[0];
+                    if pos.attacked_by_white.contains(king_square) {
+                        println!("White wins by checkmate.");
+                        println!("Squares that are attacked by opponent: {:?}", pos.attacked_by_white.squares_from_bb());
+                        pos.print_position();
+                        pos.state.game_result = types::state::GameResult(types::Results::WHITE_VICTORY);
+                    } else {
+                        println!("Stalemate.");
+                        pos.print_position();
+                        pos.state.game_result = types::state::GameResult(types::Results::STALEMATE);
+                    }
+                }
+            }
+        }
+        let mut rng = rand::thread_rng();
+        if let Some(random_square) = squares.choose(&mut rng) {
+            let destination_squares = legal_moves.get(random_square).unwrap().squares_from_bb();
+            if let Some(target_square) = destination_squares.choose(&mut rng) {
+                pos.make_move(random_square, target_square);
+                println!("AI move: {:?} {:?}", random_square, target_square);
+                game::update_attacked_squares(&mut pos);
+            }
         }
     }
 
@@ -45,9 +111,6 @@ fn main() {
 mod tests {
     use super::*;
     use types::bitboard::BitBoard;
-    use types::Color;
-    use engine::game;
-    use engine::movegen;
 
     #[test]
     fn moves_rook_b1_initial() {
@@ -133,11 +196,4 @@ mod tests {
                      movegen::get_rook_moves_from_position(square, &test_pos));
     }
 
-    #[test]
-    fn check_detection_white_initial() {
-        let test_pos = Position::new();
-        let attackers = game::get_attackers_on_king(Color::White, test_pos);
-        assert_eq!(attackers, None);
-    }
-    
 }

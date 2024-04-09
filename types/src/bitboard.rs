@@ -91,6 +91,10 @@ impl BitBoard {
         Self(1 << index)
     }
 
+    pub fn remove_square(&mut self, square: Square) {
+        self.0 &= !(1 << square as usize);
+    }
+
     pub fn count_ones(&self) -> u32 {
         self.0.count_ones()
     }

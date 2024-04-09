@@ -1,7 +1,7 @@
 use crate::bitboard::BitBoard;
 use crate::square::Square;
-use crate::{Color, Pieces, get_piece_representation};
-use crate::state::State;
+use crate::{Color, Castling, Pieces, Results, get_piece_representation};
+use crate::state::{State, GameResult};
 
 /* A position contains the minimum amount of information necessary
 / for the engine to calculate moves and evaluate the board state. */ 
@@ -15,6 +15,9 @@ pub struct Position {
     pub piece_boards: [BitBoard; 6],
 
     pub state: State,
+
+    pub attacked_by_white: BitBoard,
+    pub attacked_by_black: BitBoard,
 }
 
 impl Position {
@@ -52,6 +55,10 @@ impl Position {
             color_bitboards: bitboards,
             piece_boards,
             state: State::new(),
+
+            // Initialize attacked squares in the starting position (a3-h3 and a6-h6)
+            attacked_by_white: BitBoard::from_u64(0b111111110000000000000000),
+            attacked_by_black: BitBoard::from_u64(0b111111110000000000000000000000000000000000000000),
         }    
 
     }
@@ -114,10 +121,63 @@ impl Position {
         self.color_bitboards[0] | self.color_bitboards[1]
     }
 
-    // Shows a given move on the board by updating the position, not considering legality
-    pub fn simulate_move(&self, from: Square, to: Square) -> Self {
-        let mut new_pos = self.clone();
-        let (piece, color) = self.piece_at(from).unwrap();
+    pub fn make_move(&mut self, from: &Square, to: &Square) {
+        let (piece, color) = self.piece_at(*from).unwrap();
+        // Check for captures and update halfmove counter
+        if self.piece_at(*to).is_some() {
+            self.state.half_move_counter = 0;
+            // Remove the captured piece from the color and piece bitboards
+            let (captured_piece, captured_color) = self.piece_at(*to).unwrap();
+            let captured_piece_index = match captured_piece {
+                Pieces::ROOK => 0,
+                Pieces::KNIGHT => 1,
+                Pieces::BISHOP => 2,
+                Pieces::QUEEN => 3,
+                Pieces::KING => 4,
+                Pieces::PAWN => 5,
+                _ => panic!("Invalid piece"),
+            };
+            let to_mask = BitBoard::from_square(*to);
+            self.color_bitboards[captured_color as usize] ^= to_mask;
+            self.piece_boards[captured_piece_index] ^= to_mask;
+        } else {
+            self.state.half_move_counter += 1;
+        }
+        
+        // Update castling rights
+        match piece {
+            Pieces::KING => {
+                match color {
+                    Color::Black => self.state.castling_rights.0 &= !Castling::BLACK_CASTLING,
+                    Color::White => self.state.castling_rights.0 &= !Castling::WHITE_CASTLING,
+                }
+            },
+            Pieces::ROOK => {
+                match color {
+                    Color::Black => {
+                        if *from == Square::A8 {
+                            self.state.castling_rights.0 &= !Castling::BLACK_QUEEN_SIDE;
+                        } else if *from == Square::H8 {
+                            self.state.castling_rights.0 &= !Castling::BLACK_KING_SIDE;
+                        }
+                    },
+                    Color::White => {
+                        if *from == Square::A1 {
+                            self.state.castling_rights.0 &= !Castling::WHITE_QUEEN_SIDE;
+                        } else if *from == Square::H1 {
+                            self.state.castling_rights.0 &= !Castling::WHITE_KING_SIDE;
+                        }
+                    },
+                }
+            },
+            Pieces::PAWN => {
+                self.state.half_move_counter = 0;
+            }
+            _ => (),
+        }
+
+        let from_mask = BitBoard::from_square(*from);
+        let to_mask = BitBoard::from_square(*to);
         let piece_index = match piece {
             Pieces::ROOK => 0,
             Pieces::KNIGHT => 1,
@@ -127,19 +187,27 @@ impl Position {
             Pieces::PAWN => 5,
             _ => panic!("Invalid piece"),
         };
-        let from_mask = BitBoard::from_square(from);
-        let to_mask = BitBoard::from_square(to);
-        new_pos.color_bitboards[color as usize] ^= from_mask;
-        new_pos.color_bitboards[color as usize] |= to_mask;
-        new_pos.piece_boards[piece_index] ^= from_mask;
-        new_pos.piece_boards[piece_index] |= to_mask;
-        new_pos
+        self.color_bitboards[color as usize] ^= from_mask;
+        self.color_bitboards[color as usize] |= to_mask;
+        self.piece_boards[piece_index] ^= from_mask;
+        self.piece_boards[piece_index] |= to_mask;
+
+        self.state.switch_active_player();
+
+        // Check for draw by 50 move rule
+        // TODO: only applies if the last move didn't deliver checkmate.
+        if self.state.half_move_counter == 100 {
+            self.state.game_result = GameResult(Results::DRAW);
+        }
+
+        // TODO: update en passant square
     }
 
-    pub fn make_move(&mut self, from: Square, to: Square) {
-        *self = self.simulate_move(from, to);
-        println!("Moved from {:?} to {:?}", from, to);
-        self.state.switch_active_player();
-        // TODO: Increase move counter, update en passant square, update castling rights
+    pub fn update_attacked_squares(&mut self, attacked_squares: BitBoard, color: Color) {
+        match color {
+            Color::White => self.attacked_by_white = attacked_squares,
+            Color::Black => self.attacked_by_black = attacked_squares,
+        }
     }
+
 }

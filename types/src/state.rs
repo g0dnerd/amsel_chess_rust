@@ -38,7 +38,7 @@ impl State {
 / bit 8 is a stalemate.
 */
 #[derive(Debug, Clone, Copy, Hash, Eq, PartialEq)]
-pub struct GameResult(u8);
+pub struct GameResult(pub u8);
 
 impl GameResult {
     pub fn new() -> Self {
@@ -48,6 +48,7 @@ impl GameResult {
     pub fn is_ongoing(self) -> bool {
         self == GameResult(Results::ONGOING)
     }
+
 }
 
 impl Default for GameResult {
@@ -63,7 +64,7 @@ impl Default for GameResult {
 / bit 7 is black's king side castling rights and
 / bit 8 is black's queen side castling rights. */
 #[derive(Debug, Clone, Copy, Hash, Eq, PartialEq)]
-pub struct CastlingRights(u8);
+pub struct CastlingRights(pub u8);
 
 impl CastlingRights {
     fn all() -> Self {

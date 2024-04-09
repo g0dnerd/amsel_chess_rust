@@ -8,6 +8,7 @@ edition = "2021"
 [dependencies]
 types = { path = "../types" }
 precompute = { path = "../precompute" }
+rand = "0.8.5"
 
 [[bin]]
 name = "engine"
