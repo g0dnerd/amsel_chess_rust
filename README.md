@@ -15,8 +15,6 @@ Compute and save magic bitboards by running `cargo build --bin precompute`
 * remove the second binary crate and move the precomputation work to `cargo build` for the main binary
 * add castling to king's move generation
 * add en passant
-* add player checkmate detection (for now, only engine can be checkmated because user doesn't have every legal move generated)
-* add promotion (auto-promote to queens for now)
 
 ### Done
 * dynamic storage of slider paths & attacks to further increase performance
