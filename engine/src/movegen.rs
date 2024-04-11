@@ -1,6 +1,6 @@
 use std::collections::HashMap;
-use crate::game::update_attacked_squares;
 use crate::magics::*;
+use crate::game;
 use precompute::magics::MagicTableEntry;
 use precompute::precompute_magics::{BISHOP, ROOK};
 use types::bitboard::BitBoard;
@@ -78,22 +78,16 @@ pub fn get_all_slider_moves(color: Color, pos: &Position) -> BitBoard {
     moves
 }
 
-pub fn attacked_by_pawns(color: Color, pos: &Position) -> BitBoard {
+pub fn pawn_attacks(position: &mut Position, square: Square) -> BitBoard {
     let mut moves = BitBoard::empty();
-    let pawns = pos.color_bitboards[color as usize] & pos.piece_boards[5];
-    for square in pawns.squares_from_bb() {
-        let piece_moves = get_pawn_attacks(square, pos);
-        moves |= piece_moves;
-    }
-    moves
-}
-
-pub fn attacked_by_knights(color: Color, pos: &Position) -> BitBoard {
-    let mut moves = BitBoard::empty();
-    let knights = pos.color_bitboards[color as usize] & pos.piece_boards[1];
-    for square in knights.squares_from_bb() {
-        let piece_moves = get_knight_moves(square, pos);
-        moves |= piece_moves;
+    let color = position.piece_at(square).unwrap().1;
+    for &dx in &[-1, 1] {
+        if let Some(offset_by_delta) = square.try_offset(dx, match color {
+            Color::White => 1,
+            Color::Black => -1,
+        }){
+            moves |= BitBoard::from_square(offset_by_delta);
+        }
     }
     moves
 }
@@ -105,11 +99,11 @@ fn magic_index(entry: &MagicTableEntry, blockers: BitBoard) -> usize {
     entry.offset as usize + index
 }
 
-pub fn get_rook_moves_from_position(square: Square, position: &Position) -> BitBoard {
+pub fn get_rook_moves(square: Square, position: &Position) -> BitBoard {
     // Handle potential errors when trying to unwrap a piece from an empty square
     let piece = position.piece_at(square);
     match piece {
-        None => panic!("get_king_moves called on empty square"),
+        None => panic!("get_rook_moves called on empty square"),
         _ => (),
     }
 
@@ -130,11 +124,11 @@ pub fn get_rook_moves_from_blockers(square: Square, blockers: BitBoard) -> BitBo
     BitBoard(ROOK_MOVES[index])
 }
 
-pub fn get_bishop_moves_from_position(square: Square, position: &Position) -> BitBoard {
+pub fn get_bishop_moves(square: Square, position: &Position) -> BitBoard {
     // Handle potential errors when trying to unwrap a piece from an empty square
     let piece = position.piece_at(square);
     match piece {
-        None => panic!("get_king_moves called on empty square"),
+        None => panic!("get_bishop_moves called on empty square"),
         _ => (),
     }
 
@@ -155,9 +149,9 @@ pub fn get_bishop_moves_from_blockers(square: Square, blockers: BitBoard) -> Bit
     BitBoard(BISHOP_MOVES[index])
 }
 
-pub fn get_queen_moves_from_position(square: Square, position: &Position) -> BitBoard {
-    get_rook_moves_from_position(square, position)
-        | get_bishop_moves_from_position(square, position)
+pub fn get_queen_moves(square: Square, position: &Position) -> BitBoard {
+    get_rook_moves(square, position)
+        | get_bishop_moves(square, position)
 }
 
 pub fn get_queen_moves_from_blockers(square: Square, blockers: BitBoard) -> BitBoard {
@@ -169,7 +163,7 @@ pub fn get_knight_moves(square: Square, position: &Position) -> BitBoard {
     // Handle potential errors when trying to unwrap a piece from an empty square
     let piece = position.piece_at(square);
     match piece {
-        None => panic!("get_king_moves called on empty square"),
+        None => panic!("get_knight_moves called on empty square"),
         _ => (),
     }
     let mut moves = BitBoard::empty();
@@ -262,20 +256,6 @@ pub fn get_king_moves(square: Square, position: &Position) -> BitBoard {
     moves
 }
 
-pub fn get_pawn_attacks(square: Square, position: &Position) -> BitBoard {
-    let mut moves = BitBoard::empty();
-    let color = position.piece_at(square).unwrap().1;
-    for &dx in &[-1, 1] {
-        if let Some(offset_by_delta) = square.try_offset(dx, match color {
-            Color::White => 1,
-            Color::Black => -1,
-        }){
-            moves |= BitBoard::from_square(offset_by_delta);
-        }
-    }
-    moves
-}
-
 pub fn get_pawn_moves(square: Square, position: &Position) -> BitBoard {
     let mut moves = BitBoard::empty();
     let color = position.piece_at(square).unwrap().1;
@@ -313,10 +293,10 @@ pub fn get_pawn_moves(square: Square, position: &Position) -> BitBoard {
 pub fn get_moves_by_square(square: Square, pos: &Position) -> BitBoard {
     let piece = pos.piece_at(square).unwrap().0;
     match piece {
-        0 => get_rook_moves_from_position(square, pos),
+        0 => get_rook_moves(square, pos),
         1 => get_knight_moves(square, pos),
-        2 => get_bishop_moves_from_position(square, pos),
-        3 => get_queen_moves_from_position(square, pos),
+        2 => get_bishop_moves(square, pos),
+        3 => get_queen_moves(square, pos),
         4 => get_king_moves(square, pos),
         5 => get_pawn_moves(square, pos),
         _ => BitBoard::empty(),
@@ -331,10 +311,10 @@ pub fn get_all_legal_moves_for_color(color: Color, pos: &Position) -> HashMap<Sq
     for square in squares {
         let piece = pos.piece_at(square).unwrap().0;
         let piece_moves = match piece {
-            0 => get_rook_moves_from_position(square, pos),
+            0 => get_rook_moves(square, pos),
             1 => get_knight_moves(square, pos),
-            2 => get_bishop_moves_from_position(square, pos),
-            3 => get_queen_moves_from_position(square, pos),
+            2 => get_bishop_moves(square, pos),
+            3 => get_queen_moves(square, pos),
             4 => get_king_moves(square, pos),
             5 => get_pawn_moves(square, pos),
             _ => BitBoard::empty(),
@@ -345,13 +325,21 @@ pub fn get_all_legal_moves_for_color(color: Color, pos: &Position) -> HashMap<Sq
 
     // Iterate over all moves and remove those that would put or leave the king in check
     let mut moves_to_remove: Vec<Square> = Vec::new();
-    for (square, piece_moves) in moves.iter_mut() {
+    for (&square, piece_moves) in moves.iter_mut() {
         let squares = piece_moves.squares_from_bb();
         for target_square in squares {
             let mut new_pos = pos.clone();
-            new_pos.make_move(square, &target_square);
-            new_pos.state.active_player = !new_pos.state.active_player;
-            update_attacked_squares(&mut new_pos);
+            new_pos.make_move(&square, &target_square);
+            // If the moved piece was attacking at least 1 square or was blocking a slider piece, update attackers
+            if !new_pos.attack_bitboards[square as usize].is_empty() {
+                let blocked_sliders = pos.is_blocking_slider(square);
+                if blocked_sliders.contains(square) {
+                    game::update_slider_blockers(&mut new_pos, blocked_sliders);
+                    game::update_slider_attacks(&mut new_pos, blocked_sliders);
+                }
+                game::attacks_from_square(&mut new_pos, square, target_square);
+                new_pos.sync_attack_bitboards();
+            }
             match color {
                 Color::White => {
                     let king_square = (new_pos.piece_boards[4] & new_pos.color_bitboards[0]).squares_from_bb()[0];
@@ -369,7 +357,7 @@ pub fn get_all_legal_moves_for_color(color: Color, pos: &Position) -> HashMap<Sq
             }
         }
         if piece_moves.is_empty() {
-            moves_to_remove.push(*square);
+            moves_to_remove.push(square);
             continue;
         }
     }

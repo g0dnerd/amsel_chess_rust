@@ -17,7 +17,7 @@ fn main() {
         /* match pos.state.active_player {
             types::Color::White => println!("Squares that are attacked by opponent: {:?}", pos.attacked_by_black.squares_from_bb()),
             types::Color::Black => println!("Squares that are attacked by opponent: {:?}", pos.attacked_by_white.squares_from_bb()),
-        } */
+        } */ 
 
         // Get user input in the format of "a1 a2"
         let mut input = String::new();
@@ -43,7 +43,16 @@ fn main() {
         match move_legality {
             Ok(_) => {
                 pos.make_move(&square, &target_square);
-                game::update_attacked_squares(&mut pos);
+                // If the moved piece was attacking at least 1 square or was blocking a slider piece, update attackers
+                if !pos.attack_bitboards[square as usize].is_empty() {
+                    let blocked_sliders = pos.is_blocking_slider(square);
+                    if blocked_sliders.contains(square) {
+                        game::update_slider_blockers(&mut pos, blocked_sliders);
+                        game::update_slider_attacks(&mut pos, blocked_sliders);
+                    }
+                    game::attacks_from_square(&mut pos, square, target_square);
+                    pos.sync_attack_bitboards();
+                }
             },
             Err(e) => {
                 println!("Illegal move: {}", e);
@@ -52,12 +61,7 @@ fn main() {
         }
 
         // Make a random move for the AI
-
         println!("It is now {:?}'s turn.", pos.state.active_player);
-        /* match pos.state.active_player {
-            types::Color::White => println!("Squares that are attacked by opponent: {:?}", pos.attacked_by_black.squares_from_bb()),
-            types::Color::Black => println!("Squares that are attacked by opponent: {:?}", pos.attacked_by_white.squares_from_bb()),
-        } */
 
         let legal_moves = 
             movegen::get_all_legal_moves_for_color(pos.state.active_player, &pos);
@@ -103,7 +107,16 @@ fn main() {
             if let Some(target_square) = destination_squares.choose(&mut rng) {
                 pos.make_move(random_square, target_square);
                 println!("AI move: {:?} {:?}", random_square, target_square);
-                game::update_attacked_squares(&mut pos);
+                // If the moved piece was attacking at least 1 square or was blocking a slider piece, update attackers
+                if !pos.attack_bitboards[square as usize].is_empty() {
+                    let blocked_sliders = pos.is_blocking_slider(square);
+                    if blocked_sliders.contains(square) {
+                        game::update_slider_blockers(&mut pos, blocked_sliders);
+                        game::update_slider_attacks(&mut pos, blocked_sliders);
+                    }
+                    game::attacks_from_square(&mut pos, *random_square, *target_square);
+                    pos.sync_attack_bitboards();
+                }
             }
         }
     }
@@ -119,7 +132,7 @@ mod tests {
     fn moves_rook_b1_initial() {
         let test_pos = Position::new();
         let square = Square::B1;
-        let moves = movegen::get_rook_moves_from_position(square, &test_pos);
+        let moves = movegen::get_rook_moves(square, &test_pos);
         assert_eq!(moves, BitBoard::empty());
     }
 
@@ -143,7 +156,7 @@ mod tests {
     fn moves_bishop_c1_initial() {
         let test_pos = Position::new();
         let square = Square::C1;
-        let moves = movegen::get_bishop_moves_from_position(square, &test_pos);
+        let moves = movegen::get_bishop_moves(square, &test_pos);
         assert_eq!(moves, BitBoard::empty());
     }
 
@@ -151,7 +164,7 @@ mod tests {
     fn moves_queen_d1_initial() {
         let test_pos = Position::new();
         let square = Square::D1;
-        let moves = movegen::get_queen_moves_from_position(square, &test_pos);
+        let moves = movegen::get_queen_moves(square, &test_pos);
         assert_eq!(moves, BitBoard::empty());
     }
 
@@ -193,10 +206,10 @@ mod tests {
         let test_pos = Position::new();
         let square = Square::D4;
         let _moves = (movegen::get_king_moves(square, &test_pos),
-                     movegen::get_queen_moves_from_position(square, &test_pos),
-                     movegen::get_bishop_moves_from_position(square, &test_pos),
+                     movegen::get_queen_moves(square, &test_pos),
+                     movegen::get_bishop_moves(square, &test_pos),
                      movegen::get_knight_moves(square, &test_pos),
-                     movegen::get_rook_moves_from_position(square, &test_pos));
+                     movegen::get_rook_moves(square, &test_pos));
     }
 
 }
