@@ -3,7 +3,9 @@ use types::Color;
 use types::bitboard::BitBoard;
 use types::square::Square;
 use crate::movegen;
+use rand::seq::SliceRandom;
 
+// Passes updated attack bitboards to the position struct from the given position and move
 pub fn attacks_from_square(pos: &mut Position, from: Square, to: Square) {
     let mut attacks = BitBoard::empty();
     if let Some(piece) = pos.piece_at(to) {
@@ -25,6 +27,7 @@ pub fn update_sliders(pos: &mut Position, affected: BitBoard) {
     update_slider_attacks(pos, affected);
 }
 
+// Updates the blockers for all sliders in the given bitboard
 fn update_slider_blockers(pos: &mut Position, affected: BitBoard) {
     let mut blockers = BitBoard::empty();
     for square in affected.squares_from_bb() {
@@ -40,6 +43,7 @@ fn update_slider_blockers(pos: &mut Position, affected: BitBoard) {
     }
 }
 
+// Updates the attacked pieces for all sliders in the given bitboard
 fn update_slider_attacks(pos: &mut Position, affected: BitBoard) {
     let mut attacks = BitBoard::empty();
     for square in affected.squares_from_bb() {
@@ -85,15 +89,14 @@ pub fn is_legal_move(from: Square, to: Square, pos: &Position) -> Result<(), Str
     if moves.contains(to) {
         let mut new_pos = pos.clone();
         let is_slider = (pos.piece_boards[0] | pos.piece_boards[2] | pos.piece_boards[3]).contains(from);
-        let is_capture = pos.piece_at(to).is_some();
         let blocked_sliders = new_pos.is_blocking_slider(from);
         new_pos.make_move(&from, &to);
         new_pos.attack_bitboards[from as usize] = BitBoard::empty();
         let color = pos.piece_at(from).unwrap().1;// If the moved piece was attacking at least 1 square, update attackers
-        if !new_pos.attack_bitboards[from as usize].is_empty() || is_capture {
-            attacks_from_square(&mut new_pos, from, to);
-        }
-        let affected_sliders = new_pos.is_square_attacked_by_slider(to);
+
+        attacks_from_square(&mut new_pos, from, to);
+        
+        let affected_sliders = new_pos.is_blocking_slider(to);
         // If the moved piece was blocking or is now blocking a slider, update attackers
         if !blocked_sliders.is_empty() {
             update_sliders(&mut new_pos, blocked_sliders);                
@@ -125,5 +128,114 @@ pub fn is_legal_move(from: Square, to: Square, pos: &Position) -> Result<(), Str
     Ok(())
     } else {
         Err("This move is not possible for the selected piece!".to_string())
+    }
+}
+
+pub fn make_player_move(pos: &mut Position, from: Square, to: Square) {
+    // Bitboard of sliders that no longer have the path blocked by the moved piece
+    let freed_sliders = pos.is_blocking_slider(from);
+    let is_slider = (pos.piece_boards[0] | pos.piece_boards[2] | pos.piece_boards[3]).contains(from);
+    pos.make_move(&from, &to);
+    
+    // Bitboard of sliders that now have their path blocked by the moved piece
+    let blocked_sliders = pos.is_blocking_slider(to);
+
+    // Update the attack map for the moved piece
+    attacks_from_square(pos, from, to);
+
+    // If there are any sliders that are no longer blocked, update their attack and blocker maps
+    if !freed_sliders.is_empty() {
+        pos.slider_blockers[from as usize] = BitBoard::empty();
+        update_sliders(pos, freed_sliders);
+    }
+    // If there are newly blocked sliders, update their attack and blocker maps
+    if !blocked_sliders.is_empty() {
+        pos.slider_blockers[from as usize] = BitBoard::empty();
+        update_sliders(pos, blocked_sliders);
+    }
+    // If the moved piece is a slider, update its attack and blocker maps
+    if is_slider {
+        pos.slider_blockers[from as usize] = BitBoard::empty();
+        update_sliders(pos, BitBoard::from_square(to));
+    }
+}
+
+pub fn make_engine_move(pos: &mut Position) {
+
+    let legal_moves = 
+        movegen::get_all_legal_moves_for_color(pos.state.active_player, &pos);
+
+    let squares: Vec<Square> = legal_moves
+        .iter()
+        .filter_map(|(square, moves)|
+            if !moves.is_empty() { Some(*square) } else { None})
+        .collect();
+
+    // If the AI has no legal moves, change the game result to stalemate, draw or checkmate
+    if legal_moves.is_empty() {
+        match pos.state.active_player {
+            types::Color::White => {
+                let king_square = (pos.piece_boards[4] & pos.color_bitboards[0]).squares_from_bb()[0];
+                if pos.attacked_by_black.contains(king_square) {
+                    println!("Black wins by checkmate.");
+                    println!("Complete attacker map: {:?}", pos.attack_bitboards);
+                    println!("Squares that are attacked by opponent: {:?}", pos.attacked_by_black.squares_from_bb());
+                    pos.print_position();
+                    pos.state.game_result = types::state::GameResult(types::Results::BLACK_VICTORY);
+                } else {
+                    println!("Stalemate.");
+                    pos.print_position();
+                    pos.state.game_result = types::state::GameResult(types::Results::STALEMATE);
+                }
+            },
+            types::Color::Black => {
+                let king_square = (pos.piece_boards[4] & pos.color_bitboards[1]).squares_from_bb()[0];
+                if pos.attacked_by_white.contains(king_square) {
+                    println!("White wins by checkmate.");
+                    println!("Complete attacker map: {:?}", pos.attack_bitboards);
+                    println!("Squares that are attacked by opponent: {:?}", pos.attacked_by_white.squares_from_bb());
+                    pos.print_position();
+                    pos.state.game_result = types::state::GameResult(types::Results::WHITE_VICTORY);
+                } else {
+                    println!("Stalemate.");
+                    pos.print_position();
+                    pos.state.game_result = types::state::GameResult(types::Results::STALEMATE);
+                }
+            }
+        }
+    }
+
+    // Randomly choose a move for the engine to make
+    let mut rng = rand::thread_rng();
+    if let Some(from) = squares.choose(&mut rng) {
+        let to = legal_moves.get(from).unwrap().squares_from_bb();
+        if let Some(target_square) = to.choose(&mut rng) {
+            println!("AI move: {:?} {:?}", from, target_square);
+
+            // Bitboard of sliders that no longer have their path blocked by the moved piece
+            let blocked_sliders = pos.is_blocking_slider(*from);
+            let is_slider = (pos.piece_boards[0] | pos.piece_boards[2] | pos.piece_boards[3]).contains(*from);
+            pos.make_move(from, target_square);
+            
+            // Bitboard of sliders that now have their path blocked by the moved piece
+            let affected_sliders = pos.is_blocking_slider(*target_square);
+            
+            // Update the attack map for the moved piece
+            attacks_from_square(pos, *from, *target_square);
+
+            // If there are any sliders that are no longer blocked, update their attack and blocker maps
+            if !blocked_sliders.is_empty() {
+                update_sliders(pos, blocked_sliders);
+            }
+            // If there are newly blocked sliders, update their attack and blocker maps
+            if !affected_sliders.is_empty() {
+                update_sliders(pos, affected_sliders);
+            }
+            // If the moved piece is a slider, update its attack and blocker maps
+            if is_slider {
+                pos.slider_blockers[*from as usize] = BitBoard::empty();
+                update_sliders(pos, BitBoard::from_square(*target_square));
+            }
+        }
     }
 }

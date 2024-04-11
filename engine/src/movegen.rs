@@ -330,38 +330,55 @@ pub fn get_all_legal_moves_for_color(color: Color, pos: &Position) -> HashMap<Sq
         for target_square in squares {
             let mut new_pos = pos.clone();
             let is_slider = (pos.piece_boards[0] | pos.piece_boards[2] | pos.piece_boards[3]).contains(square);
-            let is_capture = pos.piece_at(target_square).is_some();
+            let is_king = pos.piece_boards[4].contains(square);
+
+            // List of sliders that after the move no longer have their path blocker by the moved piece
             let blocked_sliders = new_pos.is_blocking_slider(square);
             new_pos.make_move(&square, &target_square);
-            new_pos.attack_bitboards[square as usize] = BitBoard::empty();
-            // If the moved piece was attacking at least 1 square, update attackers
-            if !new_pos.attack_bitboards[square as usize].is_empty() || is_capture {
-                game::attacks_from_square(&mut new_pos, square, target_square);
-            }
-            let affected_sliders = new_pos.is_square_attacked_by_slider(target_square);
-            // If the moved piece was blocking or is now blocking a slider, update attackers
+
+            // Bitboard of squares of sliders that now have their path blocked by the new pieces
+            let affected_sliders = new_pos.is_blocking_slider(target_square);
+            println!("While checking move from {:?} to {:?}, newly blocked sliders are {:?}", square, target_square, affected_sliders.squares_from_bb());
+
+            // update attackers for the moved piece
+            game::attacks_from_square(&mut new_pos, square, target_square);
+
+            // If the moved piece was blocking a slider, update those sliders
             if !blocked_sliders.is_empty() {
+                new_pos.slider_blockers[square as usize] = BitBoard::empty();
                 game::update_sliders(&mut new_pos, blocked_sliders);                
-            }   
+            }
+
+            // If the moved piece now blocks a slider, update those sliders
             if !affected_sliders.is_empty() {
+                // If the moved piece is a king and is blocking an opposing slider, the move is illegal
+                if is_king && (affected_sliders & new_pos.color_bitboards[!color as usize] != BitBoard::empty()) {
+                    moves_to_remove.push(square);
+                    continue;
+                }
+                new_pos.slider_blockers[square as usize] = BitBoard::empty();
                 game::update_sliders(&mut new_pos, affected_sliders);
             }
+            // If the moved piece is a slider, update it
             if is_slider {
+                new_pos.slider_blockers[square as usize] = BitBoard::empty();
                 new_pos.slider_blockers[square as usize] = BitBoard::empty();
                 game::update_sliders(&mut new_pos, BitBoard::from_square(target_square));
             }
+            // If after these updates, the king is in the list of attacked squares, the move is illegal
             match color {
                 Color::White => {
                     let king_square = (new_pos.piece_boards[4] & new_pos.color_bitboards[0]).squares_from_bb()[0];
                     if new_pos.attacked_by_black.contains(king_square) {
-                        // Update the corresponding entry in the hash map by removing target_square from the entry
                         piece_moves.remove_square(target_square);
+                        continue;
                     }
                 },
                 Color::Black => {
                     let king_square = (new_pos.piece_boards[4] & new_pos.color_bitboards[1]).squares_from_bb()[0];
                     if new_pos.attacked_by_white.contains(king_square) {
                         piece_moves.remove_square(target_square);
+                        continue;
                     }
                 }
             }
@@ -375,6 +392,5 @@ pub fn get_all_legal_moves_for_color(color: Color, pos: &Position) -> HashMap<Sq
     for square in moves_to_remove {
         moves.remove(&square);
     }
-
     moves
 }
