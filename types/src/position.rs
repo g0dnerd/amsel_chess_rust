@@ -1,7 +1,8 @@
 use crate::bitboard::BitBoard;
 use crate::square::Square;
-use crate::{Color, Castling, Pieces, Results, get_piece_representation};
+use crate::{Color, Castling, Results, get_piece_representation};
 use crate::state::{State, GameResult};
+use crate::Piece;
 
 /* A position contains the minimum amount of information necessary
 / for the engine to calculate moves and evaluate the board state. */ 
@@ -154,12 +155,12 @@ impl Position {
             (0..=5).find(|&i| self.piece_boards[i].0 & mask != 0) {
 
             match piece_index {
-                0 => Pieces::ROOK,
-                1 => Pieces::KNIGHT,
-                2 => Pieces::BISHOP,
-                3 => Pieces::QUEEN,
-                4 => Pieces::KING,
-                5 => Pieces::PAWN,
+                0 => Piece::ROOK,
+                1 => Piece::KNIGHT,
+                2 => Piece::BISHOP,
+                3 => Piece::QUEEN,
+                4 => Piece::KING,
+                5 => Piece::PAWN,
                 _ => panic!("Invalid piece index"),
             }
         } else {
@@ -181,12 +182,12 @@ impl Position {
             // Remove the captured piece from the color and piece bitboards
             let (captured_piece, captured_color) = self.piece_at(*to).unwrap();
             let captured_piece_index = match captured_piece {
-                Pieces::ROOK => 0,
-                Pieces::KNIGHT => 1,
-                Pieces::BISHOP => 2,
-                Pieces::QUEEN => 3,
-                Pieces::KING => 4,
-                Pieces::PAWN => 5,
+                Piece::ROOK => 0,
+                Piece::KNIGHT => 1,
+                Piece::BISHOP => 2,
+                Piece::QUEEN => 3,
+                Piece::KING => 4,
+                Piece::PAWN => 5,
                 _ => panic!("Invalid piece"),
             };
             let to_mask = BitBoard::from_square(*to);
@@ -198,13 +199,13 @@ impl Position {
         
         // Update castling rights
         match piece {
-            Pieces::KING => {
+            Piece::KING => {
                 match color {
                     Color::Black => self.state.castling_rights.0 &= !Castling::BLACK_CASTLING,
                     Color::White => self.state.castling_rights.0 &= !Castling::WHITE_CASTLING,
                 }
             },
-            Pieces::ROOK => {
+            Piece::ROOK => {
                 match color {
                     Color::Black => {
                         if *from == Square::A8 {
@@ -222,8 +223,9 @@ impl Position {
                     },
                 }
             },
-            Pieces::PAWN => {
+            Piece::PAWN => {
                 self.state.half_move_counter = 0;
+                // Check for promotions. Auto-promote to queen for now
             }
             _ => (),
         }
@@ -231,12 +233,12 @@ impl Position {
         let from_mask = BitBoard::from_square(*from);
         let to_mask = BitBoard::from_square(*to);
         let piece_index = match piece {
-            Pieces::ROOK => 0,
-            Pieces::KNIGHT => 1,
-            Pieces::BISHOP => 2,
-            Pieces::QUEEN => 3,
-            Pieces::KING => 4,
-            Pieces::PAWN => 5,
+            Piece::ROOK => 0,
+            Piece::KNIGHT => 1,
+            Piece::BISHOP => 2,
+            Piece::QUEEN => 3,
+            Piece::KING => 4,
+            Piece::PAWN => 5,
             _ => panic!("Invalid piece"),
         };
         self.color_bitboards[color as usize] ^= from_mask;
@@ -247,7 +249,6 @@ impl Position {
         self.state.switch_active_player();
 
         // Check for draw by 50 move rule
-        // TODO: only applies if the last move didn't deliver checkmate.
         if self.state.half_move_counter == 100 {
             self.state.game_result = GameResult(Results::DRAW);
         }
@@ -315,5 +316,28 @@ impl Position {
     
     pub fn update_slider_blockers(&mut self, square: Square, blockers: BitBoard) {
         self.slider_blockers[square as usize] = blockers;
+    }
+
+    pub fn promote_pawn(&mut self, square: Square, target_piece: u8) {
+        println!("Promoting pawn on square {:?}", square);
+        let mask = BitBoard::from_square(square);
+        let color = if self.color_bitboards[0].contains(square) {
+            Color::White
+        } else {
+            Color::Black
+        };
+        // Get the piece index for the target piece
+        let piece_index = match target_piece {
+            Piece::ROOK => 0,
+            Piece::KNIGHT => 1,
+            Piece::BISHOP => 2,
+            Piece::QUEEN => 3,
+            _ => panic!("Invalid target piece"),
+        };
+
+        self.piece_boards[5] ^= mask;
+        self.color_bitboards[color as usize] ^= mask;
+        self.piece_boards[piece_index] |= mask;
+        self.color_bitboards[color as usize] |= mask;
     }
 }

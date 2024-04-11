@@ -42,8 +42,9 @@ impl Results {
 }
 
 // Provides the index for each piece type
-pub struct Pieces;
-impl Pieces {
+#[derive(Debug)]
+pub struct Piece;
+impl Piece {
     pub const ROOK: u8 = 0;
     pub const KNIGHT: u8 = 1;
     pub const BISHOP: u8 = 2;

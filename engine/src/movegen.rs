@@ -8,6 +8,7 @@ use types::position::Position;
 use types::Castling;
 use types::square::Square;
 use types::Color;
+use std::time::Instant;
 
 /* Use our ray-scanning algorithm from the precompute module to get potential blockers for a piece,
 / then AND the result with the all_pieces BitBoard to get the actual blockers. */
@@ -304,6 +305,7 @@ pub fn get_moves_by_square(square: Square, pos: &Position) -> BitBoard {
 }
 
 pub fn get_all_legal_moves_for_color(color: Color, pos: &Position) -> HashMap<Square, BitBoard> {
+    let start_time = Instant::now();
     let mut moves: HashMap<Square, BitBoard> = HashMap::new();
 
     // Iterate over all squares with a piece of the given color
@@ -338,7 +340,6 @@ pub fn get_all_legal_moves_for_color(color: Color, pos: &Position) -> HashMap<Sq
 
             // Bitboard of squares of sliders that now have their path blocked by the new pieces
             let affected_sliders = new_pos.is_blocking_slider(target_square);
-            println!("While checking move from {:?} to {:?}, newly blocked sliders are {:?}", square, target_square, affected_sliders.squares_from_bb());
 
             // update attackers for the moved piece
             game::attacks_from_square(&mut new_pos, square, target_square);
@@ -392,5 +393,8 @@ pub fn get_all_legal_moves_for_color(color: Color, pos: &Position) -> HashMap<Sq
     for square in moves_to_remove {
         moves.remove(&square);
     }
+    let end_time = Instant::now();
+    let elapsed_time = end_time.duration_since(start_time);
+    println!("Time to calculate legal moves for color {:?}: {:?} milliseconds", color, elapsed_time);
     moves
 }

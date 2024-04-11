@@ -29,18 +29,15 @@ fn main() {
                 continue;
             }
         }
+
         let squares = input_legality.unwrap();
         let square = Square::index(squares[0]);
         let target_square = Square::index(squares[1]);
-
-        // Check if the user move is legal
-        let move_legality = game::is_legal_move(square, target_square, &pos);
-        match move_legality {
-            Ok(_) => {
-                game::make_player_move(&mut pos, square, target_square);
-            },
+        
+        match game::make_player_move(&mut pos, square, target_square) {
+            Ok(_) => (),
             Err(e) => {
-                println!("Illegal move: {}", e);
+                println!("Error: {}", e);
                 continue;
             }
         }
@@ -49,6 +46,11 @@ fn main() {
         // Make a random engine move
         game::make_engine_move(&mut pos);
     }
+
+    // Wait for the user to press enter before closing the program
+    let mut input = String::new();
+    println!("Press enter to close the game.");
+    std::io::stdin().read_line(&mut input).unwrap();
 
 }
 
