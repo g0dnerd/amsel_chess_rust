@@ -49,19 +49,13 @@ fn main() {
                     game::attacks_from_square(&mut pos, square, target_square);
                 }
                 let affected_sliders = pos.is_square_attacked_by_slider(target_square);
-                println!("Piece was blocking sliders on squares: {:?}", blocked_sliders.squares_from_bb());
-                println!("Piece is now blocking sliders on squares: {:?}", affected_sliders.squares_from_bb());
                 if !blocked_sliders.is_empty() || !affected_sliders.is_empty() {
-                    game::update_slider_blockers(&mut pos, blocked_sliders);
-                    game::update_slider_attacks(&mut pos, blocked_sliders);
-                    game::update_slider_blockers(&mut pos, affected_sliders);
-                    game::update_slider_attacks(&mut pos, affected_sliders);
+                    game::update_sliders(&mut pos, blocked_sliders);
+                    game::update_sliders(&mut pos, affected_sliders);
                 }
                 if is_slider {
-                    println!("Slider piece was moved, updating attacks.");
                     pos.slider_blockers[square as usize] = BitBoard::empty();
-                    game::update_slider_blockers(&mut pos, BitBoard::from_square(target_square));
-                    game::update_slider_attacks(&mut pos, BitBoard::from_square(target_square));
+                    game::update_sliders(&mut pos, BitBoard::from_square(target_square));
                 }
             },
             Err(e) => {
@@ -127,17 +121,15 @@ fn main() {
                     game::attacks_from_square(&mut pos, *random_square, *target_square);
                 }
                 let affected_sliders = pos.is_square_attacked_by_slider(*target_square);
-                if !blocked_sliders.is_empty() || !affected_sliders.is_empty() {
-                    game::update_slider_blockers(&mut pos, blocked_sliders);
-                    game::update_slider_attacks(&mut pos, blocked_sliders);
-                    game::update_slider_blockers(&mut pos, affected_sliders);
-                    game::update_slider_attacks(&mut pos, affected_sliders);
+                if !blocked_sliders.is_empty() {
+                    game::update_sliders(&mut pos, blocked_sliders);
+                }
+                if !affected_sliders.is_empty() {
+                    game::update_sliders(&mut pos, affected_sliders);
                 }
                 if is_slider {
-                    println!("Slider piece was moved, updating attacks.");
                     pos.slider_blockers[square as usize] = BitBoard::empty();
-                    game::update_slider_blockers(&mut pos, BitBoard::from_square(*target_square));
-                    game::update_slider_attacks(&mut pos, BitBoard::from_square(*target_square));
+                    game::update_sliders(&mut pos, BitBoard::from_square(*target_square));
                 }
             }
         }

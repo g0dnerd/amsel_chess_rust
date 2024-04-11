@@ -20,7 +20,12 @@ pub fn attacks_from_square(pos: &mut Position, from: Square, to: Square) {
     pos.update_attacks_from_square(from, to, attacks);
 }
 
-pub fn update_slider_blockers(pos: &mut Position, affected: BitBoard) {
+pub fn update_sliders(pos: &mut Position, affected: BitBoard) {
+    update_slider_blockers(pos, affected);
+    update_slider_attacks(pos, affected);
+}
+
+fn update_slider_blockers(pos: &mut Position, affected: BitBoard) {
     let mut blockers = BitBoard::empty();
     for square in affected.squares_from_bb() {
         if let Some(piece) = pos.piece_at(square) {
@@ -35,7 +40,7 @@ pub fn update_slider_blockers(pos: &mut Position, affected: BitBoard) {
     }
 }
 
-pub fn update_slider_attacks(pos: &mut Position, affected: BitBoard) {
+fn update_slider_attacks(pos: &mut Position, affected: BitBoard) {
     let mut attacks = BitBoard::empty();
     for square in affected.squares_from_bb() {
         if let Some(piece) = pos.piece_at(square) {
@@ -79,8 +84,27 @@ pub fn is_legal_move(from: Square, to: Square, pos: &Position) -> Result<(), Str
     // Check if the move is possible for the selected piece
     if moves.contains(to) {
         let mut new_pos = pos.clone();
+        let is_slider = (pos.piece_boards[0] | pos.piece_boards[2] | pos.piece_boards[3]).contains(from);
+        let is_capture = pos.piece_at(to).is_some();
+        let blocked_sliders = new_pos.is_blocking_slider(from);
         new_pos.make_move(&from, &to);
-        let color = pos.piece_at(from).unwrap().1;
+        new_pos.attack_bitboards[from as usize] = BitBoard::empty();
+        let color = pos.piece_at(from).unwrap().1;// If the moved piece was attacking at least 1 square, update attackers
+        if !new_pos.attack_bitboards[from as usize].is_empty() || is_capture {
+            attacks_from_square(&mut new_pos, from, to);
+        }
+        let affected_sliders = new_pos.is_square_attacked_by_slider(to);
+        // If the moved piece was blocking or is now blocking a slider, update attackers
+        if !blocked_sliders.is_empty() {
+            update_sliders(&mut new_pos, blocked_sliders);                
+        }   
+        if !affected_sliders.is_empty() {
+            update_sliders(&mut new_pos, affected_sliders);
+        }
+        if is_slider {
+            new_pos.slider_blockers[from as usize] = BitBoard::empty();
+            update_sliders(&mut new_pos, BitBoard::from_square(to));
+        }
         // Check if the move would put the king in check
         match color {
             Color::White => {
