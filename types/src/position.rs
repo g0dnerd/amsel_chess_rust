@@ -300,7 +300,6 @@ impl Position {
                 }
             }
         }
-        println!("Square {:?} is attacked by sliders on {:?}", square, affected.squares_from_bb());
         affected
     }
 
