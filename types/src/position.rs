@@ -88,17 +88,17 @@ impl Position {
         attacks[57] = BitBoard::from_u64(0b1010000000000000000000000000000000000000000);
         attacks[62] = BitBoard::from_u64(0b101000000000000000000000000000000000000000000000);
 
-        slider_blockers[0] = BitBoard::from_u64(0b1000000000000000000000000000000000000000101111110);
+        slider_blockers[0] = BitBoard::from_u64(0b100000010);
         slider_blockers[2] = BitBoard::from_u64(0b101000000000);
-        slider_blockers[3] = BitBoard::from_u64(0b1000000000000000000000000000000000000001110001110110);
+        slider_blockers[3] = BitBoard::from_u64(0b1110000010100);
         slider_blockers[5] = BitBoard::from_u64(0b101000000000000);
-        slider_blockers[7] = BitBoard::from_u64(0b10000000000000000000000000000000000000001000000001111110);
+        slider_blockers[7] = BitBoard::from_u64(0b1000000001000000);
 
-        slider_blockers[56] = BitBoard::from_u64(0b111111000000001000000000000000000000000000000000000000100000000);
+        slider_blockers[56] = BitBoard::from_u64(0b1000000001000000000000000000000000000000000000000000000000);
         slider_blockers[58] = BitBoard::from_u64(0b1010000000000000000000000000000000000000000000000000);
-        slider_blockers[59] = BitBoard::from_u64(0b111011000011100000000000000000000000000000000000000100000000000);
+        slider_blockers[59] = BitBoard::from_u64(0b1010000001000000000000000000000000000000000000000000000000000);
         slider_blockers[61] = BitBoard::from_u64(0b1010000000000000000000000000000000000000000000000000000);
-        slider_blockers[63] = BitBoard::from_u64(0b111111010000000000000000000000000000000000000001000000000000000);
+        slider_blockers[63] = BitBoard::from_u64(0b100000010000000000000000000000000000000000000000000000000000000);
 
         let attacked_by_white = BitBoard::from_u64(0b111111110000000000000000);
         let attacked_by_black = BitBoard::from_u64(0b111111110000000000000000000000000000000000000000);
@@ -258,9 +258,8 @@ impl Position {
     pub fn update_attacks_from_square(&mut self, from: Square, to: Square, attacks: BitBoard) {
         self.attack_bitboards[from as usize] = BitBoard::empty();
         self.attack_bitboards[to as usize] = attacks;
-    }
-
-    pub fn sync_attack_bitboards(&mut self) {
+        self.attacked_by_white = BitBoard::empty();
+        self.attacked_by_black = BitBoard::empty();
         for i in 0..64 {
             if let Some(piece) = self.piece_at(Square::index(i)) {
                 match piece.1 {
@@ -285,6 +284,24 @@ impl Position {
             }
         }
         false
+    }
+
+    pub fn is_square_attacked_by_slider(&self, square: Square) -> BitBoard {
+        let mut affected = BitBoard::empty();
+        for i in 0..64 {
+            if self.attack_bitboards[i].contains(square) {
+                if let Some(piece) = self.piece_at(Square::index(i)) {
+                    match piece.0 {
+                        0 => affected |= BitBoard::from_square(Square::index(i)),
+                        2 => affected |= BitBoard::from_square(Square::index(i)),
+                        3 => affected |= BitBoard::from_square(Square::index(i)),
+                        _ => (),
+                    }
+                }
+            }
+        }
+        println!("Square {:?} is attacked by sliders on {:?}", square, affected.squares_from_bb());
+        affected
     }
 
     pub fn is_blocking_slider(&self, square: Square) -> BitBoard {

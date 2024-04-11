@@ -328,17 +328,32 @@ pub fn get_all_legal_moves_for_color(color: Color, pos: &Position) -> HashMap<Sq
     for (&square, piece_moves) in moves.iter_mut() {
         let squares = piece_moves.squares_from_bb();
         for target_square in squares {
+            println!("Checking AI move legality for move from {:?} to {:?}", square, target_square);
             let mut new_pos = pos.clone();
+            let is_slider = (pos.piece_boards[0] | pos.piece_boards[2] | pos.piece_boards[3]).contains(square);
+            let is_capture = pos.piece_at(target_square).is_some();
+            let blocked_sliders = new_pos.is_blocking_slider(square);
             new_pos.make_move(&square, &target_square);
-            // If the moved piece was attacking at least 1 square or was blocking a slider piece, update attackers
-            if !new_pos.attack_bitboards[square as usize].is_empty() {
-                let blocked_sliders = pos.is_blocking_slider(square);
-                if blocked_sliders.contains(square) {
-                    game::update_slider_blockers(&mut new_pos, blocked_sliders);
-                    game::update_slider_attacks(&mut new_pos, blocked_sliders);
-                }
+            new_pos.attack_bitboards[square as usize] = BitBoard::empty();
+            // If the moved piece was attacking at least 1 square, update attackers
+            if !new_pos.attack_bitboards[square as usize].is_empty() || is_capture {
                 game::attacks_from_square(&mut new_pos, square, target_square);
-                new_pos.sync_attack_bitboards();
+            }
+            let affected_sliders = new_pos.is_square_attacked_by_slider(target_square);
+            println!("Blocked sliders: {:?}", blocked_sliders);
+            println!("Affected sliders: {:?}", affected_sliders);
+            // If the moved piece was blocking or is now blocking a slider, update attackers
+            if !blocked_sliders.is_empty() || !affected_sliders.is_empty() {
+                game::update_slider_blockers(&mut new_pos, blocked_sliders);
+                game::update_slider_attacks(&mut new_pos, blocked_sliders);
+                game::update_slider_blockers(&mut new_pos, affected_sliders);
+                game::update_slider_attacks(&mut new_pos, affected_sliders);
+            }
+            if is_slider {
+                println!("Slider piece was moved, updating attacks.");
+                new_pos.slider_blockers[square as usize] = BitBoard::empty();
+                game::update_slider_blockers(&mut new_pos, BitBoard::from_square(target_square));
+                game::update_slider_attacks(&mut new_pos, BitBoard::from_square(target_square));
             }
             match color {
                 Color::White => {
@@ -352,6 +367,9 @@ pub fn get_all_legal_moves_for_color(color: Color, pos: &Position) -> HashMap<Sq
                     let king_square = (new_pos.piece_boards[4] & new_pos.color_bitboards[1]).squares_from_bb()[0];
                     if new_pos.attacked_by_white.contains(king_square) {
                         piece_moves.remove_square(target_square);
+                        println!("Removing move from {:?} to {:?} because it would put the king in check", square, target_square);
+                        println!("Complete attacker map: {:?}", new_pos.attack_bitboards);
+                        println!("Compared move to attacked squares: {:?}", new_pos.attacked_by_white);
                     }
                 }
             }

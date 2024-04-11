@@ -1,6 +1,7 @@
 use std::env;
 use types::position::Position;
 use types::square::Square;
+use types::bitboard::BitBoard;
 use engine::{movegen, game, parse_input};
 use rand::seq::SliceRandom;
 
@@ -14,10 +15,6 @@ fn main() {
         pos.print_position();
 
         println!("It is now {:?}'s turn.", pos.state.active_player);
-        /* match pos.state.active_player {
-            types::Color::White => println!("Squares that are attacked by opponent: {:?}", pos.attacked_by_black.squares_from_bb()),
-            types::Color::Black => println!("Squares that are attacked by opponent: {:?}", pos.attacked_by_white.squares_from_bb()),
-        } */ 
 
         // Get user input in the format of "a1 a2"
         let mut input = String::new();
@@ -42,16 +39,29 @@ fn main() {
         let move_legality = game::is_legal_move(square, target_square, &pos);
         match move_legality {
             Ok(_) => {
+                let blocked_sliders = pos.is_blocking_slider(square);
+                let is_slider = (pos.piece_boards[0] | pos.piece_boards[2] | pos.piece_boards[3]).contains(square);
+                let is_capture = pos.piece_at(target_square).is_some();
                 pos.make_move(&square, &target_square);
-                // If the moved piece was attacking at least 1 square or was blocking a slider piece, update attackers
-                if !pos.attack_bitboards[square as usize].is_empty() {
-                    let blocked_sliders = pos.is_blocking_slider(square);
-                    if blocked_sliders.contains(square) {
-                        game::update_slider_blockers(&mut pos, blocked_sliders);
-                        game::update_slider_attacks(&mut pos, blocked_sliders);
-                    }
+                pos.attack_bitboards[square as usize] = BitBoard::empty();
+                // If the moved piece was attacking at least 1 square or the move was a capture, update attackers
+                if !pos.attack_bitboards[square as usize].is_empty() || is_capture {
                     game::attacks_from_square(&mut pos, square, target_square);
-                    pos.sync_attack_bitboards();
+                }
+                let affected_sliders = pos.is_square_attacked_by_slider(target_square);
+                println!("Piece was blocking sliders on squares: {:?}", blocked_sliders.squares_from_bb());
+                println!("Piece is now blocking sliders on squares: {:?}", affected_sliders.squares_from_bb());
+                if !blocked_sliders.is_empty() || !affected_sliders.is_empty() {
+                    game::update_slider_blockers(&mut pos, blocked_sliders);
+                    game::update_slider_attacks(&mut pos, blocked_sliders);
+                    game::update_slider_blockers(&mut pos, affected_sliders);
+                    game::update_slider_attacks(&mut pos, affected_sliders);
+                }
+                if is_slider {
+                    println!("Slider piece was moved, updating attacks.");
+                    pos.slider_blockers[square as usize] = BitBoard::empty();
+                    game::update_slider_blockers(&mut pos, BitBoard::from_square(target_square));
+                    game::update_slider_attacks(&mut pos, BitBoard::from_square(target_square));
                 }
             },
             Err(e) => {
@@ -77,8 +87,9 @@ fn main() {
                     let king_square = (pos.piece_boards[4] & pos.color_bitboards[0]).squares_from_bb()[0];
                     if pos.attacked_by_black.contains(king_square) {
                         println!("Black wins by checkmate.");
-                        pos.print_position();
+                        println!("Complete attacker map: {:?}", pos.attack_bitboards);
                         println!("Squares that are attacked by opponent: {:?}", pos.attacked_by_black.squares_from_bb());
+                        pos.print_position();
                         pos.state.game_result = types::state::GameResult(types::Results::BLACK_VICTORY);
                     } else {
                         println!("Stalemate.");
@@ -90,6 +101,7 @@ fn main() {
                     let king_square = (pos.piece_boards[4] & pos.color_bitboards[1]).squares_from_bb()[0];
                     if pos.attacked_by_white.contains(king_square) {
                         println!("White wins by checkmate.");
+                        println!("Complete attacker map: {:?}", pos.attack_bitboards);
                         println!("Squares that are attacked by opponent: {:?}", pos.attacked_by_white.squares_from_bb());
                         pos.print_position();
                         pos.state.game_result = types::state::GameResult(types::Results::WHITE_VICTORY);
@@ -105,17 +117,27 @@ fn main() {
         if let Some(random_square) = squares.choose(&mut rng) {
             let destination_squares = legal_moves.get(random_square).unwrap().squares_from_bb();
             if let Some(target_square) = destination_squares.choose(&mut rng) {
+                let blocked_sliders = pos.is_blocking_slider(square);
+                let is_slider = (pos.piece_boards[0] | pos.piece_boards[2] | pos.piece_boards[3]).contains(square);
+                let is_capture = pos.piece_at(*target_square).is_some();
                 pos.make_move(random_square, target_square);
                 println!("AI move: {:?} {:?}", random_square, target_square);
                 // If the moved piece was attacking at least 1 square or was blocking a slider piece, update attackers
-                if !pos.attack_bitboards[square as usize].is_empty() {
-                    let blocked_sliders = pos.is_blocking_slider(square);
-                    if blocked_sliders.contains(square) {
-                        game::update_slider_blockers(&mut pos, blocked_sliders);
-                        game::update_slider_attacks(&mut pos, blocked_sliders);
-                    }
+                if !pos.attack_bitboards[square as usize].is_empty() || is_capture {
                     game::attacks_from_square(&mut pos, *random_square, *target_square);
-                    pos.sync_attack_bitboards();
+                }
+                let affected_sliders = pos.is_square_attacked_by_slider(*target_square);
+                if !blocked_sliders.is_empty() || !affected_sliders.is_empty() {
+                    game::update_slider_blockers(&mut pos, blocked_sliders);
+                    game::update_slider_attacks(&mut pos, blocked_sliders);
+                    game::update_slider_blockers(&mut pos, affected_sliders);
+                    game::update_slider_attacks(&mut pos, affected_sliders);
+                }
+                if is_slider {
+                    println!("Slider piece was moved, updating attacks.");
+                    pos.slider_blockers[square as usize] = BitBoard::empty();
+                    game::update_slider_blockers(&mut pos, BitBoard::from_square(*target_square));
+                    game::update_slider_attacks(&mut pos, BitBoard::from_square(*target_square));
                 }
             }
         }
