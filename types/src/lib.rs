@@ -61,6 +61,7 @@ pub fn get_piece_representation(piece: u8) -> char {
     PIECE_REPRESENTATIONS[piece as usize]
 }
 
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
 pub struct Castling;
 impl Castling {
     pub const NO_CASTLING: u8 = 0;

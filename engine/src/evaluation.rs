@@ -1,5 +1,6 @@
 use std::cmp;
 use types::position::Position;
+use types::Results;
 
 /* const PIECE_SQUARE_TABLES: [[i32; 64]; 6] = [
     // ROOKS
@@ -79,18 +80,23 @@ const ENDGAME_LIMIT: u32 = 3915;
 const MATERIAL_VALUES_MIDGAME: [u32; 6] = [1276, 781, 825, 2538, 0, 124];
 const MATERIAL_VALUES_ENDGAME: [u32; 6] = [1380, 854, 915, 2682, 0, 206];
 
-pub fn main_evaluation(pos: &mut Position) -> u32 {
+pub fn main_evaluation(pos: &mut Position) -> i32 {
+    if pos.state.game_result == types::state::GameResult(Results::WHITE_VICTORY) {
+        return 10000;
+    } else if pos.state.game_result == types::state::GameResult(Results::BLACK_VICTORY) {
+        return -10000;
+    }
     let midgame_evaluation = get_midgame_evaluation(pos);
     let mut endgame_evaluation = get_endgame_evaluation(pos);
-    let phase = get_phase_value(pos);
-    endgame_evaluation = endgame_evaluation * scale_factor(pos, endgame_evaluation) / 64;
+    let phase = get_phase_value(pos) as i32;
+    endgame_evaluation = endgame_evaluation * scale_factor(pos, endgame_evaluation) as i32 / 64;
     let evaluation = (midgame_evaluation * phase + ((endgame_evaluation * (128 - phase)))) / 128;
     // evaluation += tempo(pos);
     evaluation
 }
 
 // The scale factor scales down the weight of the endgame evaluation value in the main evaluation
-fn scale_factor(pos: &mut Position, endgame_evaluation: u32) -> u32 {
+fn scale_factor(pos: &mut Position, endgame_evaluation: i32) -> u32 {
     let pos_flipped = pos.colorflip();
     let (pos_white, pos_black) = if endgame_evaluation > 0 {
         (pos.clone(), pos_flipped.clone())
@@ -168,17 +174,17 @@ fn get_npm(pos: &Position) -> u32 {
     npm
 }
 
-fn get_midgame_evaluation(pos: &mut Position) -> u32 {
+fn get_midgame_evaluation(pos: &mut Position) -> i32 {
     let mut evaluation_score = 0;
     let pos_flipped = pos.colorflip();
-    evaluation_score += get_piece_value_midgame(pos) - get_piece_value_midgame(&pos_flipped);
+    evaluation_score += get_piece_value_midgame(pos) as i32 - get_piece_value_midgame(&pos_flipped) as i32;
     evaluation_score
 }
 
-fn get_endgame_evaluation(pos: &mut Position) -> u32 {
-    let mut evaluation_score: u32 = 0;
+fn get_endgame_evaluation(pos: &mut Position) -> i32 {
+    let mut evaluation_score: i32 = 0;
     let pos_flipped = pos.colorflip();
-    evaluation_score += get_piece_value_endgame(pos) - get_piece_value_endgame(&pos_flipped);
+    evaluation_score += get_piece_value_endgame(pos) as i32 - get_piece_value_endgame(&pos_flipped) as i32;
     evaluation_score
 }
 

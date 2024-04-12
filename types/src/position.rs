@@ -1,7 +1,7 @@
 use crate::bitboard::BitBoard;
 use crate::square::Square;
 use crate::{Color, Castling, Results, get_piece_representation};
-use crate::state::{State, GameResult};
+use crate::state::{State, GameResult, CastlingRights};
 use crate::Piece;
 
 /* A position contains the minimum amount of information necessary
@@ -24,6 +24,10 @@ pub struct Position {
 
     // Contains information about blocked slider paths
     pub slider_blockers: [BitBoard; 64],
+
+    was_last_move_capture: Option<u8>,
+    castling_rights_history: Vec<CastlingRights>,
+    halfmove_clock_history: Vec<u8>,
 
 }
 
@@ -103,6 +107,10 @@ impl Position {
 
         let attacked_by_white = BitBoard::from_u64(0b111111110000000000000000);
         let attacked_by_black = BitBoard::from_u64(0b111111110000000000000000000000000000000000000000);
+
+        let last_capture = None;
+        let castling_rights_history = Vec::new();
+        let halfmove_clock_history = Vec::new();
         
         Self {
             color_bitboards: bitboards,
@@ -112,6 +120,9 @@ impl Position {
             attacked_by_white,
             attacked_by_black,
             slider_blockers,
+            was_last_move_capture: last_capture,
+            castling_rights_history,
+            halfmove_clock_history,
         }    
 
     }
@@ -190,14 +201,20 @@ impl Position {
                 Piece::PAWN => 5,
                 _ => panic!("Invalid piece"),
             };
+            self.was_last_move_capture = Some(captured_piece);
             let to_mask = BitBoard::from_square(*to);
             self.color_bitboards[captured_color as usize] ^= to_mask;
             self.piece_bitboards[captured_piece_index] ^= to_mask;
         } else {
             self.state.half_move_counter += 1;
+            self.halfmove_clock_history.push(self.state.half_move_counter);
         }
         
+        // If the move was not a capture, edit the flag accordingly
+        self.was_last_move_capture = None;
+        
         // Update castling rights
+        self.castling_rights_history.push(self.state.castling_rights);
         match piece {
             Piece::KING => {
                 match color {
@@ -225,6 +242,7 @@ impl Position {
             },
             Piece::PAWN => {
                 self.state.half_move_counter = 0;
+                self.halfmove_clock_history.push(self.state.half_move_counter);
                 // Check for promotions. Auto-promote to queen for now
             }
             _ => (),
@@ -256,6 +274,52 @@ impl Position {
         // TODO: update en passant square
     }
 
+    /* pub fn unmake_move(&mut self, from: &Square, to: &Square) {
+        // Find the piece that was moved
+        let (piece, color) = self.piece_at(*to).unwrap();
+        let piece_index = match piece {
+            Piece::ROOK => 0,
+            Piece::KNIGHT => 1,
+            Piece::BISHOP => 2,
+            Piece::QUEEN => 3,
+            Piece::KING => 4,
+            Piece::PAWN => 5,
+            _ => panic!("Invalid piece"),
+        };
+        // Switch the active player back
+        self.state.switch_active_player();
+
+        // Move the piece back
+        let from_mask = BitBoard::from_square(*from);
+        let to_mask = BitBoard::from_square(*to);
+        self.color_bitboards[color as usize] ^= to_mask;
+        self.color_bitboards[color as usize] |= from_mask;
+        self.piece_bitboards[piece_index] ^= to_mask;
+        self.piece_bitboards[piece_index] |= from_mask;
+
+        // Check if the move was a capture
+        if let Some(captured_piece) = self.was_last_move_capture {
+            let captured_piece_index = match captured_piece {
+                Piece::ROOK => 0,
+                Piece::KNIGHT => 1,
+                Piece::BISHOP => 2,
+                Piece::QUEEN => 3,
+                Piece::KING => 4,
+                Piece::PAWN => 5,
+                _ => panic!("Invalid piece"),
+            };
+            let captured_mask = BitBoard::from_square(*to);
+            self.color_bitboards[!self.state.active_player as usize] |= captured_mask;
+            self.piece_bitboards[captured_piece_index] |= captured_mask;
+        }
+
+        // Revert castling rights by 1 index
+        self.state.castling_rights = self.castling_rights_history.pop().unwrap();
+
+        // Revert halfmove counter by 1 index
+        self.state.half_move_counter = self.halfmove_clock_history.pop().unwrap();
+    }
+ */
     pub fn update_attacks_from_square(&mut self, from: Square, to: Square, attacks: BitBoard) {
         self.attack_bitboards[from as usize] = BitBoard::empty();
         self.attack_bitboards[to as usize] = attacks;
@@ -306,9 +370,19 @@ impl Position {
 
     pub fn is_blocking_slider(&self, square: Square) -> BitBoard {
         let mut blocked_sliders = BitBoard::empty();
+        if self.attacked_by_black | self.attacked_by_white == BitBoard::empty() {
+            return blocked_sliders;
+        }
         for i in 0..64 {
-            if self.slider_blockers[i].contains(square) {
-                blocked_sliders |= BitBoard::from_square(Square::index(i));
+            if self.attack_bitboards[i].contains(square) {
+                if let Some(piece) = self.piece_at(Square::index(i)) {
+                    match piece.0 {
+                        0 => blocked_sliders |= BitBoard::from_square(Square::index(i)),
+                        2 => blocked_sliders |= BitBoard::from_square(Square::index(i)),
+                        3 => blocked_sliders |= BitBoard::from_square(Square::index(i)),
+                        _ => (),
+                    }
+                }
             }            
         }
         blocked_sliders
@@ -316,6 +390,18 @@ impl Position {
     
     pub fn update_slider_blockers(&mut self, square: Square, blockers: BitBoard) {
         self.slider_blockers[square as usize] = blockers;
+    }
+
+    pub fn is_promotion(&self, start: &Square, end: &Square) -> bool {
+        let (piece, color) = self.piece_at(*start).unwrap();
+        if piece == Piece::PAWN {
+            if color == Color::White && end.rank_index() == 7 {
+                return true;
+            } else if color == Color::Black && end.rank_index() == 0 {
+                return true;
+            }
+        }
+        false
     }
 
     pub fn promote_pawn(&mut self, square: Square, target_piece: u8) {
@@ -353,5 +439,14 @@ impl Position {
         new_position.state = self.state;
         new_position.state.active_player = !self.state.active_player;
         new_position
+    }
+
+    pub fn is_capture(&self, end: &Square) -> bool {
+        if let Some(piece) = self.piece_at(*end) {
+            if piece.1 != self.state.active_player {
+                return true;
+            }
+        }
+        false
     }
 }

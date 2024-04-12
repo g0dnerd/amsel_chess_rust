@@ -34,6 +34,11 @@ fn main() {
         let square = Square::index(squares[0]);
         let target_square = Square::index(squares[1]);
         
+        match pos.state.active_player {
+            types::Color::White => println!("White attacks before move: {:?}", pos.attacked_by_white),
+            types::Color::Black => println!("Black attacks before move: {:?}", pos.attacked_by_black),
+        }
+
         match game::make_player_move(&mut pos, square, target_square) {
             Ok(_) => (),
             Err(e) => {
@@ -42,12 +47,22 @@ fn main() {
             }
         }
 
-        println!("Current evaluation: {}", evaluation::main_evaluation(&mut pos));
+        match pos.state.active_player {
+            types::Color::Black => println!("White attacks after move: {:?}", pos.attacked_by_white),
+            types::Color::White => println!("Black attacks after move: {:?}", pos.attacked_by_black),
+        }
+
+        pos.print_position();
         
         println!("It is now {:?}'s turn.", pos.state.active_player);
         
         // Make a random engine move
-        game::make_engine_move(&mut pos);
+        if let Some(result) = game::make_random_engine_move(&mut pos) {
+            pos.state.game_result = result;
+            break;
+        }
+        // Make the best engine move
+        // game::make_engine_move(&mut pos);
         println!("Current evaluation: {}", evaluation::main_evaluation(&mut pos));
     }
 

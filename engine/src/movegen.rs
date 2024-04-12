@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+// use std::collections::HashMap;
 use crate::magics::*;
 use crate::game;
 use precompute::magics::MagicTableEntry;
@@ -304,7 +304,7 @@ pub fn get_moves_by_square(square: Square, pos: &Position) -> BitBoard {
     }
 }
 
-pub fn get_all_legal_moves_for_color(color: Color, pos: &Position) -> HashMap<Square, BitBoard> {
+/* pub fn get_all_legal_moves_for_color(color: Color, pos: &mut Position) -> HashMap<Square, BitBoard> {
     let start_time = Instant::now();
     let mut moves: HashMap<Square, BitBoard> = HashMap::new();
 
@@ -393,6 +393,93 @@ pub fn get_all_legal_moves_for_color(color: Color, pos: &Position) -> HashMap<Sq
     for square in moves_to_remove {
         moves.remove(&square);
     }
+    let end_time = Instant::now();
+    let elapsed_time = end_time.duration_since(start_time);
+    println!("Time to calculate legal moves for color {:?}: {:?} milliseconds", color, elapsed_time);
+    moves
+} */
+
+pub fn get_all_legal_moves_for_color(color: Color, pos: &mut Position) -> Vec<(Square, Square)> {
+    let start_time = Instant::now();
+    let mut moves: Vec<(Square, Square)> = Vec::new();
+
+    // Iterate over all squares with a piece of the given color
+    let squares = pos.color_bitboards[color as usize].squares_from_bb();
+    for square in squares {
+        let piece = pos.piece_at(square).unwrap().0;
+        let piece_moves = match piece {
+            0 => get_rook_moves(square, pos),
+            1 => get_knight_moves(square, pos),
+            2 => get_bishop_moves(square, pos),
+            3 => get_queen_moves(square, pos),
+            4 => get_king_moves(square, pos),
+            5 => get_pawn_moves(square, pos),
+            _ => BitBoard::empty(),
+        };
+
+        for piece_move in piece_moves.squares_from_bb() {
+            moves.push((square, piece_move));
+        }
+    }
+
+    // Iterate over all moves and remove those that would put or leave the king in check
+    let mut moves_to_remove: Vec<(Square, Square)> = Vec::new();
+    for (square, target_square) in moves.iter() {
+        println!("Checking move {:?} {:?}", square, target_square);
+        let mut new_pos = pos.clone();
+        let is_king = new_pos.piece_bitboards[4].contains(*square);
+
+        // List of sliders that after the move no longer have their path blocker by the moved piece
+        let blocked_sliders = new_pos.is_blocking_slider(*square);
+        println!("Move would unblock sliders on squares: {:?}", blocked_sliders.squares_from_bb());
+        new_pos.make_move(&square, &target_square);
+
+        // Bitboard of squares of sliders that now have their path blocked by the new pieces
+        let affected_sliders = new_pos.is_blocking_slider(*target_square);
+        println!("Move would block sliders on squares: {:?}", affected_sliders.squares_from_bb());
+
+        // update attackers for the moved piece
+        game::attacks_from_square(&mut new_pos, *square, *target_square);
+
+        // If the moved piece was blocking a slider, update those sliders
+        if !blocked_sliders.is_empty() {
+            // new_pos.slider_blockers[*square as usize] = BitBoard::empty();
+            game::update_sliders(&mut new_pos, blocked_sliders);                
+        }
+
+        // If the moved piece now blocks a slider, update those sliders
+        if !affected_sliders.is_empty() {
+            // If the moved piece is a king and is blocking an opposing slider, the move is illegal
+            if is_king && (affected_sliders & new_pos.color_bitboards[!color as usize] != BitBoard::empty()) {
+                // Flag only this move for removal
+                moves_to_remove.push((*square, *target_square));
+                continue;
+            }
+            // new_pos.slider_blockers[*square as usize] = BitBoard::empty();
+            game::update_sliders(&mut new_pos, affected_sliders);
+        }
+
+        // If after these updates, the king is in the list of attacked squares, the move is illegal
+        match color {
+            Color::White => {
+                let king_square = (new_pos.piece_bitboards[4] & new_pos.color_bitboards[0]).squares_from_bb()[0];
+                if new_pos.attacked_by_black.contains(king_square) {
+                    moves_to_remove.push((*square, *target_square));
+                    continue;
+                }
+            },
+            Color::Black => {
+                let king_square = (new_pos.piece_bitboards[4] & new_pos.color_bitboards[1]).squares_from_bb()[0];
+                if new_pos.attacked_by_white.contains(king_square) {
+                    println!("Move would leave king in check");
+                    moves_to_remove.push((*square, *target_square));
+                    continue;
+                }
+            }
+        }
+    }
+    // Remove all tuples from moves that are in moves_to_remove
+    moves.retain(|&x| !moves_to_remove.contains(&x));
     let end_time = Instant::now();
     let elapsed_time = end_time.duration_since(start_time);
     println!("Time to calculate legal moves for color {:?}: {:?} milliseconds", color, elapsed_time);
