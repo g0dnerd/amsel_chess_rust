@@ -88,7 +88,7 @@ pub fn is_legal_move(from: Square, to: Square, pos: &Position) -> Result<(), Str
     // Check if the move is possible for the selected piece
     if moves.contains(to) {
         let mut new_pos = pos.clone();
-        let is_slider = (pos.piece_boards[0] | pos.piece_boards[2] | pos.piece_boards[3]).contains(from);
+        let is_slider = (pos.piece_bitboards[0] | pos.piece_bitboards[2] | pos.piece_bitboards[3]).contains(from);
         let blocked_sliders = new_pos.is_blocking_slider(from);
         new_pos.make_move(&from, &to);
         new_pos.attack_bitboards[from as usize] = BitBoard::empty();
@@ -111,14 +111,14 @@ pub fn is_legal_move(from: Square, to: Square, pos: &Position) -> Result<(), Str
         // Check if the move would put the king in check
         match color {
             Color::White => {
-                let king_square = (new_pos.piece_boards[4] & new_pos.color_bitboards[0]).squares_from_bb()[0];
+                let king_square = (new_pos.piece_bitboards[4] & new_pos.color_bitboards[0]).squares_from_bb()[0];
                 if new_pos.attacked_by_black.contains(king_square) {
                     // Update the corresponding entry in the hash map by removing target_square from the entry
                     return Err("This move would put your king in check!".to_string());
                 }
             },
             Color::Black => {
-                let king_square = (new_pos.piece_boards[4] & new_pos.color_bitboards[1]).squares_from_bb()[0];
+                let king_square = (new_pos.piece_bitboards[4] & new_pos.color_bitboards[1]).squares_from_bb()[0];
                 if new_pos.attacked_by_white.contains(king_square) {
                     return Err("This move would put your king in check!".to_string());
                 }
@@ -147,7 +147,7 @@ pub fn make_player_move(pos: &mut Position, from: Square, to: Square) -> Result<
     if legal_moves.is_empty() {
         match pos.state.active_player {
             types::Color::White => {
-                let king_square = (pos.piece_boards[4] & pos.color_bitboards[0]).squares_from_bb()[0];
+                let king_square = (pos.piece_bitboards[4] & pos.color_bitboards[0]).squares_from_bb()[0];
                 if pos.attacked_by_black.contains(king_square) {
                     println!("Black wins by checkmate.");
                     pos.print_position();
@@ -159,7 +159,7 @@ pub fn make_player_move(pos: &mut Position, from: Square, to: Square) -> Result<
                 }
             },
             types::Color::Black => {
-                let king_square = (pos.piece_boards[4] & pos.color_bitboards[1]).squares_from_bb()[0];
+                let king_square = (pos.piece_bitboards[4] & pos.color_bitboards[1]).squares_from_bb()[0];
                 if pos.attacked_by_white.contains(king_square) {
                     println!("White wins by checkmate.");
                     pos.print_position();
@@ -184,8 +184,8 @@ pub fn make_player_move(pos: &mut Position, from: Square, to: Square) -> Result<
 
     // Bitboard of sliders that no longer have the path blocked by the moved piece
     let freed_sliders = pos.is_blocking_slider(from);
-    let is_slider = (pos.piece_boards[0] | pos.piece_boards[2] | pos.piece_boards[3]).contains(from);
-    let is_pawn = pos.piece_boards[5].contains(from);
+    let is_slider = (pos.piece_bitboards[0] | pos.piece_bitboards[2] | pos.piece_bitboards[3]).contains(from);
+    let is_pawn = pos.piece_bitboards[5].contains(from);
     pos.make_move(&from, &to);
     
     // Bitboard of sliders that now have their path blocked by the moved piece
@@ -245,7 +245,7 @@ pub fn make_engine_move(pos: &mut Position) {
     if legal_moves.is_empty() {
         match pos.state.active_player {
             types::Color::White => {
-                let king_square = (pos.piece_boards[4] & pos.color_bitboards[0]).squares_from_bb()[0];
+                let king_square = (pos.piece_bitboards[4] & pos.color_bitboards[0]).squares_from_bb()[0];
                 if pos.attacked_by_black.contains(king_square) {
                     println!("Black wins by checkmate.");
                     println!("Complete attacker map: {:?}", pos.attack_bitboards);
@@ -259,7 +259,7 @@ pub fn make_engine_move(pos: &mut Position) {
                 }
             },
             types::Color::Black => {
-                let king_square = (pos.piece_boards[4] & pos.color_bitboards[1]).squares_from_bb()[0];
+                let king_square = (pos.piece_bitboards[4] & pos.color_bitboards[1]).squares_from_bb()[0];
                 if pos.attacked_by_white.contains(king_square) {
                     println!("White wins by checkmate.");
                     println!("Complete attacker map: {:?}", pos.attack_bitboards);
@@ -290,8 +290,8 @@ pub fn make_engine_move(pos: &mut Position) {
 
             // Bitboard of sliders that no longer have their path blocked by the moved piece
             let blocked_sliders = pos.is_blocking_slider(*from);
-            let is_slider = (pos.piece_boards[0] | pos.piece_boards[2] | pos.piece_boards[3]).contains(*from);
-            let is_pawn = pos.piece_boards[5].contains(*from);
+            let is_slider = (pos.piece_bitboards[0] | pos.piece_bitboards[2] | pos.piece_bitboards[3]).contains(*from);
+            let is_pawn = pos.piece_bitboards[5].contains(*from);
             pos.make_move(from, target_square);
             
             // Bitboard of sliders that now have their path blocked by the moved piece

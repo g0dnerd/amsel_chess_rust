@@ -1,7 +1,7 @@
 use std::env;
 use types::position::Position;
 use types::square::Square;
-use engine::{game, parse_input};
+use engine::{game, parse_input, evaluation};
 
 fn main() {
     env::set_var("RUST_BACKTRACE", "1");
@@ -42,9 +42,13 @@ fn main() {
             }
         }
 
+        println!("Current evaluation: {}", evaluation::main_evaluation(&mut pos));
+        
         println!("It is now {:?}'s turn.", pos.state.active_player);
+        
         // Make a random engine move
         game::make_engine_move(&mut pos);
+        println!("Current evaluation: {}", evaluation::main_evaluation(&mut pos));
     }
 
     // Wait for the user to press enter before closing the program

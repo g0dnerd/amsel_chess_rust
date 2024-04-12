@@ -4,7 +4,7 @@ use crate::square::Square;
 /* A state depicts additional information that is necessary to evaluate a position:
 / Castling rights, en passant square, halfmove clock and the active player. */
 
-#[derive(Debug, Clone, Hash, Eq, PartialEq)]
+#[derive(Debug, Clone, Copy, Hash, Eq, PartialEq)]
 pub struct State {
     pub castling_rights: CastlingRights,
     pub en_passant_square: Option<Square>,

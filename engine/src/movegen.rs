@@ -55,7 +55,7 @@ pub fn slider_moves(square: Square, blockers: BitBoard, directions: &[(i8, i8)])
 
 pub fn get_all_slider_moves(color: Color, pos: &Position) -> BitBoard {
     let mut moves = BitBoard::empty();
-    let sliders = pos.color_bitboards[color as usize] & (pos.piece_boards[0] | pos.piece_boards[2] | pos.piece_boards[3]);
+    let sliders = pos.color_bitboards[color as usize] & (pos.piece_bitboards[0] | pos.piece_bitboards[2] | pos.piece_bitboards[3]);
     for square in sliders.squares_from_bb() {
         let piece = pos.piece_at(square).unwrap().0;
         let piece_moves = match piece {
@@ -331,8 +331,8 @@ pub fn get_all_legal_moves_for_color(color: Color, pos: &Position) -> HashMap<Sq
         let squares = piece_moves.squares_from_bb();
         for target_square in squares {
             let mut new_pos = pos.clone();
-            let is_slider = (pos.piece_boards[0] | pos.piece_boards[2] | pos.piece_boards[3]).contains(square);
-            let is_king = pos.piece_boards[4].contains(square);
+            let is_slider = (pos.piece_bitboards[0] | pos.piece_bitboards[2] | pos.piece_bitboards[3]).contains(square);
+            let is_king = pos.piece_bitboards[4].contains(square);
 
             // List of sliders that after the move no longer have their path blocker by the moved piece
             let blocked_sliders = new_pos.is_blocking_slider(square);
@@ -369,14 +369,14 @@ pub fn get_all_legal_moves_for_color(color: Color, pos: &Position) -> HashMap<Sq
             // If after these updates, the king is in the list of attacked squares, the move is illegal
             match color {
                 Color::White => {
-                    let king_square = (new_pos.piece_boards[4] & new_pos.color_bitboards[0]).squares_from_bb()[0];
+                    let king_square = (new_pos.piece_bitboards[4] & new_pos.color_bitboards[0]).squares_from_bb()[0];
                     if new_pos.attacked_by_black.contains(king_square) {
                         piece_moves.remove_square(target_square);
                         continue;
                     }
                 },
                 Color::Black => {
-                    let king_square = (new_pos.piece_boards[4] & new_pos.color_bitboards[1]).squares_from_bb()[0];
+                    let king_square = (new_pos.piece_bitboards[4] & new_pos.color_bitboards[1]).squares_from_bb()[0];
                     if new_pos.attacked_by_white.contains(king_square) {
                         piece_moves.remove_square(target_square);
                         continue;

@@ -13,7 +13,7 @@ pub struct Position {
     pub color_bitboards: [BitBoard; 2],
 
     // Array of BitBoards, one for each piece type
-    pub piece_boards: [BitBoard; 6],
+    pub piece_bitboards: [BitBoard; 6],
 
     pub state: State,
 
@@ -106,7 +106,7 @@ impl Position {
         
         Self {
             color_bitboards: bitboards,
-            piece_boards,
+            piece_bitboards: piece_boards,
             state: State::new(),
             attack_bitboards: attacks,
             attacked_by_white,
@@ -152,7 +152,7 @@ impl Position {
         };
         
         let piece = if let Some(piece_index) = 
-            (0..=5).find(|&i| self.piece_boards[i].0 & mask != 0) {
+            (0..=5).find(|&i| self.piece_bitboards[i].0 & mask != 0) {
 
             match piece_index {
                 0 => Piece::ROOK,
@@ -192,7 +192,7 @@ impl Position {
             };
             let to_mask = BitBoard::from_square(*to);
             self.color_bitboards[captured_color as usize] ^= to_mask;
-            self.piece_boards[captured_piece_index] ^= to_mask;
+            self.piece_bitboards[captured_piece_index] ^= to_mask;
         } else {
             self.state.half_move_counter += 1;
         }
@@ -243,8 +243,8 @@ impl Position {
         };
         self.color_bitboards[color as usize] ^= from_mask;
         self.color_bitboards[color as usize] |= to_mask;
-        self.piece_boards[piece_index] ^= from_mask;
-        self.piece_boards[piece_index] |= to_mask;
+        self.piece_bitboards[piece_index] ^= from_mask;
+        self.piece_bitboards[piece_index] |= to_mask;
 
         self.state.switch_active_player();
 
@@ -335,9 +335,23 @@ impl Position {
             _ => panic!("Invalid target piece"),
         };
 
-        self.piece_boards[5] ^= mask;
+        self.piece_bitboards[5] ^= mask;
         self.color_bitboards[color as usize] ^= mask;
-        self.piece_boards[piece_index] |= mask;
+        self.piece_bitboards[piece_index] |= mask;
         self.color_bitboards[color as usize] |= mask;
+    }
+
+    pub fn colorflip(&mut self) -> Position {
+        let mut new_position = Position::new();
+        // Flip the color bitboards
+        new_position.color_bitboards[0] = self.color_bitboards[1].colorflip();
+        new_position.color_bitboards[1] = self.color_bitboards[0].colorflip();
+        // Flip the piece bitboards
+        for i in 0..6 {
+            new_position.piece_bitboards[i] = self.piece_bitboards[i].colorflip();
+        }
+        new_position.state = self.state;
+        new_position.state.active_player = !self.state.active_player;
+        new_position
     }
 }

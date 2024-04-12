@@ -146,4 +146,15 @@ impl BitBoard {
         squares
     }
 
+    // Colorflips itself by mirroring all pieces along the horizontal axis between 4th and 5th rank
+    // This is achieved by XORing each square with 56
+    pub fn colorflip(self) -> Self {
+        let mut flipped_self = BitBoard::empty();
+        for i in 0..64 {
+            if self.contains(Square::index(i)) {
+                flipped_self |= BitBoard::from_index(i ^ 56);
+            }
+        }
+        flipped_self
+    }
 } 
