@@ -4,78 +4,103 @@ use types::square::Square;
 use engine::{game, parse_input, evaluation};
 
 fn main() {
+    let args: Vec<String> = env::args().collect();
+    dbg!(&args);
     env::set_var("RUST_BACKTRACE", "1");
 
     // Main CLI Loop
     let mut pos = Position::new();
     
-    while pos.state.game_result.is_ongoing() {
-        pos.print_position();
-        if game::is_in_checkmate(&mut pos) {
-            match pos.state.active_player {
-                types::Color::White => {
-                    println!("Black wins by checkmate!");
-                    pos.state.game_result = types::state::GameResult(types::Results::BLACK_VICTORY);
-                    continue;
-                },
-                types::Color::Black => {
-                    println!("White wins by checkmate!");
-                    pos.state.game_result = types::state::GameResult(types::Results::WHITE_VICTORY);
+    if args[1] == "solo" {
+        while pos.state.game_result.is_ongoing() {
+            pos.print_position();
+            if game::is_in_checkmate(&mut pos) {
+                match pos.state.active_player {
+                    types::Color::White => {
+                        println!("Black wins by checkmate!");
+                        pos.state.game_result = types::state::GameResult(types::Results::BLACK_VICTORY);
+                        continue;
+                    },
+                    types::Color::Black => {
+                        println!("White wins by checkmate!");
+                        pos.state.game_result = types::state::GameResult(types::Results::WHITE_VICTORY);
+                        continue;
+                    }
+                }
+            }
+            game::make_engine_move(&mut pos);   
+        }
+    } else if args[1] == "omsolo" {
+        for _ in 0..2 {
+            pos.print_position();
+            game::make_engine_move(&mut pos);
+        }
+    } else {
+        while pos.state.game_result.is_ongoing() {
+            pos.print_position();
+            if game::is_in_checkmate(&mut pos) {
+                match pos.state.active_player {
+                    types::Color::White => {
+                        println!("Black wins by checkmate!");
+                        pos.state.game_result = types::state::GameResult(types::Results::BLACK_VICTORY);
+                        continue;
+                    },
+                    types::Color::Black => {
+                        println!("White wins by checkmate!");
+                        pos.state.game_result = types::state::GameResult(types::Results::WHITE_VICTORY);
+                        continue;
+                    }
+                }
+            }
+
+            // Get user input in the format of "a1 a2"
+            let mut input = String::new();
+            println!("Enter a valid move, type 'legal' to get a list of valid moves or press enter to have the engine move.");
+            std::io::stdin().read_line(&mut input).unwrap();
+            let input = input.trim();
+
+            // Check if the user input is in the correct format
+            let input_legality = parse_input::user_input_to_square_index(input);
+            match input_legality {
+                Ok(o) => {
+                    if o == [99, 99] {
+                        continue;
+                    } else if o == [98, 98] {
+                        println!("Legal moves: {:?}", engine::movegen::get_all_legal_moves_for_color(pos.state.active_player, &mut pos));
+                        continue;
+                    }
+                    else if o == [97, 97] {
+                        println!("Engine is making a move.");
+                        game::make_engine_move(&mut pos);
+                        continue;
+                    }
+                }
+                Err(e) => {
+                    println!("Error: {}", e);
                     continue;
                 }
             }
-        }
-        /* println!("It is now {:?}'s turn.", pos.state.active_player);
-        game::make_engine_move(&mut pos);
-        break; */
 
-        // Get user input in the format of "a1 a2"
-        let mut input = String::new();
-        println!("Enter a valid move, type 'legal' to get a list of valid moves or press enter to have the engine move.");
-        std::io::stdin().read_line(&mut input).unwrap();
-        let input = input.trim();
-
-        // Check if the user input is in the correct format
-        let input_legality = parse_input::user_input_to_square_index(input);
-        match input_legality {
-            Ok(o) => {
-                if o == [99, 99] {
-                    continue;
-                } else if o == [98, 98] {
-                    println!("Legal moves: {:?}", engine::movegen::get_all_legal_moves_for_color(pos.state.active_player, &mut pos));
-                    continue;
-                }
-                else if o == [97, 97] {
-                    println!("Engine is making a move.");
-                    game::make_engine_move(&mut pos);
+            let squares = input_legality.unwrap();
+            let square = Square::index(squares[0]);
+            let target_square = Square::index(squares[1]);
+            
+            match game::make_player_move(&mut pos, square, target_square) {
+                Ok(_) => (),
+                Err(e) => {
+                    println!("Error: {}", e);
                     continue;
                 }
             }
-            Err(e) => {
-                println!("Error: {}", e);
-                continue;
-            }
-        }
 
-        let squares = input_legality.unwrap();
-        let square = Square::index(squares[0]);
-        let target_square = Square::index(squares[1]);
-        
-        match game::make_player_move(&mut pos, square, target_square) {
-            Ok(_) => (),
-            Err(e) => {
-                println!("Error: {}", e);
-                continue;
-            }
+            println!("Current evaluation: {}", evaluation::main_evaluation(&mut pos));
         }
-
-        println!("Current evaluation: {}", evaluation::main_evaluation(&mut pos));
     }
 
     // Wait for the user to press enter before closing the program
-    /* let mut input = String::new();
+    let mut input = String::new();
     println!("Press enter to close the game.");
-    std::io::stdin().read_line(&mut input).unwrap(); */
+    std::io::stdin().read_line(&mut input).unwrap();
 
 }
 

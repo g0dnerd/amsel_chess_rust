@@ -227,7 +227,7 @@ pub fn get_king_moves(square: Square, position: &Position) -> BitBoard {
                         && position.piece_at(Square::C1).is_none()
                         && position.piece_at(Square::B1).is_none()
                     {
-                        moves |= BitBoard::from_square(Square::C1);
+                        moves |= BitBoard::from_square(Square::B1);
                     }
                 }
             }
@@ -244,7 +244,7 @@ pub fn get_king_moves(square: Square, position: &Position) -> BitBoard {
                         && position.piece_at(Square::C8).is_none()
                         && position.piece_at(Square::B8).is_none()
                     {
-                        moves |= BitBoard::from_square(Square::C8);
+                        moves |= BitBoard::from_square(Square::B8);
                     }
                 }
             
@@ -334,6 +334,37 @@ pub fn get_all_legal_moves_for_color(color: Color, pos: &mut Position) -> Vec<(S
 
         // List of sliders that after the move no longer have their path blocker by the moved piece
         let blocked_sliders = new_pos.is_blocking_slider(*square);
+
+        // Remove the move if it would castle through check
+        if pos.piece_at(*square).unwrap().0 == 4 {
+            if *square == Square::E1 && *target_square == Square::G1 {
+                if pos.attacked_by_black.contains(Square::F1) || pos.attacked_by_black.contains(Square::G1) {
+                    moves_to_remove.push((*square, *target_square));
+                    continue;
+                }
+            } else if *square == Square::E1 && *target_square == Square::B1 {
+                if pos.attacked_by_black.contains(Square::D1) ||
+                        pos.attacked_by_black.contains(Square::C1) ||
+                        pos.attacked_by_black.contains(Square::B1) {
+                    moves_to_remove.push((*square, *target_square));
+                    continue;
+                }
+            } else if *square == Square::E8 && *target_square == Square::G8 {
+                if pos.attacked_by_white.contains(Square::F8) || pos.attacked_by_white.contains(Square::G8) {
+                    moves_to_remove.push((*square, *target_square));
+                    continue;
+                }
+            } else if *square == Square::E8 && *target_square == Square::B8 {
+                if pos.attacked_by_white.contains(Square::D8) ||
+                        pos.attacked_by_white.contains(Square::C8) ||
+                        pos.attacked_by_white.contains(Square::B8) {
+                    moves_to_remove.push((*square, *target_square));
+                    continue;
+                }
+            }
+        }
+
+
         new_pos.make_move(&square, &target_square);
 
         // Bitboard of squares of sliders that now have their path blocked by the new pieces
@@ -342,7 +373,8 @@ pub fn get_all_legal_moves_for_color(color: Color, pos: &mut Position) -> Vec<(S
         
         // If the moved piece was blocking a slider, update those sliders
         if !blocked_sliders.is_empty() {
-            game::update_sliders(&mut new_pos, blocked_sliders);                
+            game::update_slider_attacks(&mut new_pos, blocked_sliders);
+            game::update_slider_blockers(&mut new_pos, blocked_sliders);              
         }
 
         // If the moved piece now blocks a slider, update those sliders
@@ -353,12 +385,15 @@ pub fn get_all_legal_moves_for_color(color: Color, pos: &mut Position) -> Vec<(S
                 moves_to_remove.push((*square, *target_square));
                 continue;
             }
-            game::update_sliders(&mut new_pos, affected_sliders);
+            game::update_slider_blockers(&mut new_pos, affected_sliders);
+            game::update_slider_attacks(&mut new_pos, affected_sliders);
         }
 
         if is_slider {
             new_pos.slider_blockers[*square as usize] = BitBoard::empty();
-            game::update_sliders(&mut new_pos, BitBoard::from_square(*square)); 
+            game::update_slider_blockers(&mut new_pos, BitBoard::from_square(*square));
+            game::update_slider_attacks(&mut new_pos, BitBoard::from_square(*square));
+
         } else {
             // update attackers for the moved piece
             game::attacks_from_square(&mut new_pos, *square, *target_square);
