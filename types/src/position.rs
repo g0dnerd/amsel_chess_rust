@@ -25,10 +25,12 @@ pub struct Position {
     // Contains information about blocked slider paths
     pub slider_blockers: [BitBoard; 64],
 
+    pub move_history: Vec<(Square, Square)>,
+
     was_last_move_capture: Option<u8>,
     castling_rights_history: Vec<CastlingRights>,
     halfmove_clock_history: Vec<u8>,
-
+    pub piece_giving_check: Option<Square>,
 }
 
 impl Position {
@@ -111,6 +113,9 @@ impl Position {
         let last_capture = None;
         let castling_rights_history = Vec::new();
         let halfmove_clock_history = Vec::new();
+
+        let move_history = Vec::new();
+        let piece_giving_check = None;
         
         Self {
             color_bitboards: bitboards,
@@ -123,6 +128,8 @@ impl Position {
             was_last_move_capture: last_capture,
             castling_rights_history,
             halfmove_clock_history,
+            move_history,
+            piece_giving_check,
         }    
 
     }
@@ -243,7 +250,6 @@ impl Position {
             Piece::PAWN => {
                 self.state.half_move_counter = 0;
                 self.halfmove_clock_history.push(self.state.half_move_counter);
-                // Check for promotions. Auto-promote to queen for now
             }
             _ => (),
         }
@@ -270,6 +276,8 @@ impl Position {
         if self.state.half_move_counter == 100 {
             self.state.game_result = GameResult(Results::DRAW);
         }
+
+        self.move_history.push((*from, *to));
 
         // TODO: update en passant square
     }

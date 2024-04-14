@@ -11,19 +11,44 @@ fn main() {
     
     while pos.state.game_result.is_ongoing() {
         pos.print_position();
-
+        if game::is_in_checkmate(&mut pos) {
+            match pos.state.active_player {
+                types::Color::White => {
+                    println!("Black wins by checkmate!");
+                    pos.state.game_result = types::state::GameResult(types::Results::BLACK_VICTORY);
+                    continue;
+                },
+                types::Color::Black => {
+                    println!("White wins by checkmate!");
+                    pos.state.game_result = types::state::GameResult(types::Results::WHITE_VICTORY);
+                    continue;
+                }
+            }
+        }
         println!("It is now {:?}'s turn.", pos.state.active_player);
 
         // Get user input in the format of "a1 a2"
         let mut input = String::new();
-        println!("Enter your move: ");
+        println!("Enter a valid move, type 'legal' to get a list of valid moves or press enter to have the engine move.");
         std::io::stdin().read_line(&mut input).unwrap();
         let input = input.trim();
 
         // Check if the user input is in the correct format
         let input_legality = parse_input::user_input_to_square_index(input);
         match input_legality {
-            Ok(_) => (),
+            Ok(o) => {
+                if o == [99, 99] {
+                    continue;
+                } else if o == [98, 98] {
+                    println!("Legal moves: {:?}", engine::movegen::get_all_legal_moves_for_color(pos.state.active_player, &mut pos));
+                    continue;
+                }
+                else if o == [97, 97] {
+                    println!("Engine is making a move.");
+                    game::make_engine_move(&mut pos);
+                    continue;
+                }
+            }
             Err(e) => {
                 println!("Error: {}", e);
                 continue;
@@ -34,11 +59,6 @@ fn main() {
         let square = Square::index(squares[0]);
         let target_square = Square::index(squares[1]);
         
-        match pos.state.active_player {
-            types::Color::White => println!("White attacks before move: {:?}", pos.attacked_by_white),
-            types::Color::Black => println!("Black attacks before move: {:?}", pos.attacked_by_black),
-        }
-
         match game::make_player_move(&mut pos, square, target_square) {
             Ok(_) => (),
             Err(e) => {
@@ -47,22 +67,6 @@ fn main() {
             }
         }
 
-        match pos.state.active_player {
-            types::Color::Black => println!("White attacks after move: {:?}", pos.attacked_by_white),
-            types::Color::White => println!("Black attacks after move: {:?}", pos.attacked_by_black),
-        }
-
-        pos.print_position();
-        
-        println!("It is now {:?}'s turn.", pos.state.active_player);
-        
-        // Make a random engine move
-        if let Some(result) = game::make_random_engine_move(&mut pos) {
-            pos.state.game_result = result;
-            break;
-        }
-        // Make the best engine move
-        // game::make_engine_move(&mut pos);
         println!("Current evaluation: {}", evaluation::main_evaluation(&mut pos));
     }
 
@@ -78,6 +82,12 @@ mod tests {
     use super::*;
     use engine::movegen;
     use types::bitboard::BitBoard;
+
+    #[test]
+    fn negate_min_int() {
+        let min_int = i32::MIN + 1;
+        assert_eq!(-min_int, i32::MAX);
+    }
 
     #[test]
     fn moves_rook_b1_initial() {

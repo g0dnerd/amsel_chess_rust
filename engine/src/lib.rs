@@ -6,6 +6,12 @@ pub mod negamax;
 
 pub mod parse_input {
     pub fn user_input_to_square_index(input: &str) -> Result<[usize; 2], String> {
+        if input == "" {
+            return Ok([97, 97]);
+        }
+        else if input == "legal" {
+            return Ok([98, 98]);
+        }
         if input.len() != 5 {
             return Err("Invalid input length".to_string());
         }

@@ -1,6 +1,6 @@
 use std::cmp;
 use types::position::Position;
-use types::Results;
+use crate::game;
 
 /* const PIECE_SQUARE_TABLES: [[i32; 64]; 6] = [
     // ROOKS
@@ -81,10 +81,12 @@ const MATERIAL_VALUES_MIDGAME: [u32; 6] = [1276, 781, 825, 2538, 0, 124];
 const MATERIAL_VALUES_ENDGAME: [u32; 6] = [1380, 854, 915, 2682, 0, 206];
 
 pub fn main_evaluation(pos: &mut Position) -> i32 {
-    if pos.state.game_result == types::state::GameResult(Results::WHITE_VICTORY) {
-        return 10000;
-    } else if pos.state.game_result == types::state::GameResult(Results::BLACK_VICTORY) {
-        return -10000;
+    if game::is_in_checkmate(pos) {
+        if pos.state.active_player == types::Color::White {
+            return i32::MIN + 1;
+        } else {
+            return i32::MAX - 1;
+        }
     }
     let midgame_evaluation = get_midgame_evaluation(pos);
     let mut endgame_evaluation = get_endgame_evaluation(pos);
