@@ -5,39 +5,61 @@ use engine::{game, parse_input, evaluation};
 
 fn main() {
     let args: Vec<String> = env::args().collect();
-    dbg!(&args);
+    // dbg!(&args);
     env::set_var("RUST_BACKTRACE", "1");
 
     // Main CLI Loop
     let mut pos = Position::new();
     
-    if args[1] == "solo" {
-        while pos.state.game_result.is_ongoing() {
-            pos.print_position();
-            if game::is_in_checkmate(&mut pos) {
-                match pos.state.active_player {
-                    types::Color::White => {
-                        println!("Black wins by checkmate!");
-                        pos.state.game_result = types::state::GameResult(types::Results::BLACK_VICTORY);
-                        continue;
-                    },
-                    types::Color::Black => {
-                        println!("White wins by checkmate!");
-                        pos.state.game_result = types::state::GameResult(types::Results::WHITE_VICTORY);
-                        continue;
-                    }
+    if args.len() > 1 {
+        match args[1].as_str() {
+            "help" => {
+                println!("Usage: [eve] [benchmark]");
+                println!("Provide no arguments to play against the engine.");
+                println!("Arguments:");
+                println!("eve - Engine vs Engine. The engine will play against itself until a result has been reached.");
+                println!("benchmark - Run the engine in benchmark mode, where it will play against itself for 3 moves.");
+                return;
+            },
+            "benchmark" => {
+                for _ in 0..3 {
+                    pos.print_position();
+                    game::make_engine_move(&mut pos);
                 }
-            }
-            game::make_engine_move(&mut pos);   
-        }
-    } else if args[1] == "omsolo" {
-        for _ in 0..2 {
-            pos.print_position();
-            game::make_engine_move(&mut pos);
+                return;
+            },
+            "eve" => {
+                println!("Running in 0 player mode.");
+                while pos.state.game_result.is_ongoing() {
+                    pos.print_position();
+                    println!("Current evaluation: {}", evaluation::main_evaluation(&mut pos));
+                    if game::is_in_checkmate(&mut pos) {
+                        match pos.state.active_player {
+                            types::Color::White => {
+                                println!("Black wins by checkmate!");
+                                pos.state.game_result = types::state::GameResult(types::Results::BLACK_VICTORY);
+                                continue;
+                            },
+                            types::Color::Black => {
+                                println!("White wins by checkmate!");
+                                pos.state.game_result = types::state::GameResult(types::Results::WHITE_VICTORY);
+                                continue;
+                            }
+                        }
+                    }
+                    game::make_engine_move(&mut pos);   
+                }
+            },
+            _ => {
+                println!("Invalid argument. Type 'help' for usage information.");
+                return;
+            }        
         }
     } else {
+        println!("Running in 1 player mode.");
         while pos.state.game_result.is_ongoing() {
             pos.print_position();
+            println!("Current evaluation: {}", evaluation::main_evaluation(&mut pos));
             if game::is_in_checkmate(&mut pos) {
                 match pos.state.active_player {
                     types::Color::White => {
@@ -92,11 +114,9 @@ fn main() {
                     continue;
                 }
             }
-
-            println!("Current evaluation: {}", evaluation::main_evaluation(&mut pos));
         }
     }
-
+    
     // Wait for the user to press enter before closing the program
     let mut input = String::new();
     println!("Press enter to close the game.");

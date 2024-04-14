@@ -410,8 +410,6 @@ pub fn make_specific_engine_move(pos: &mut Position, from: Square, target_square
                     pos.promote_pawn(target_square, types::Piece::QUEEN);
                     update_slider_blockers(pos, BitBoard::from_square(target_square));
                     update_slider_attacks(pos, BitBoard::from_square(target_square));
-                    println!("Blockers for new slider have been updated: {:?}", pos.slider_blockers);
-                    println!("Attackers have been updated: {:?}", pos.attack_bitboards);
                 }
             },
             types::Color::Black => {
@@ -419,8 +417,6 @@ pub fn make_specific_engine_move(pos: &mut Position, from: Square, target_square
                     pos.promote_pawn(target_square, types::Piece::QUEEN);
                     update_slider_blockers(pos, BitBoard::from_square(target_square));
                     update_slider_attacks(pos, BitBoard::from_square(target_square));
-                    println!("Blockers for new slider have been updated: {:?}", pos.slider_blockers);
-                    println!("Attackers have been updated: {:?}", pos.attack_bitboards);
                 }
             }
         }
