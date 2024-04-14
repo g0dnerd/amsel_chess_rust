@@ -1,75 +1,57 @@
 use std::cmp;
 use types::position::Position;
+use types::bitboard::BitBoard;
+use types::square::Square;
 use crate::game;
 
-/* const PIECE_SQUARE_TABLES: [[i32; 64]; 6] = [
+const PIECE_SQUARE_TABLES_MIDGAME: [[[i32; 8]; 4]; 5] = [
     // ROOKS
     [
-        0, 0, 0, 0, 0, 0, 0, 0,
-        5, 10, 10, 10, 10, 10, 10, 5,
-        -5, 0, 0, 0, 0, 0, 0, -5,
-        -5, 0, 0, 0, 0, 0, 0, -5,
-        -5, 0, 0, 0, 0, 0, 0, -5,
-        -5, 0, 0, 0, 0, 0, 0, -5,
-        -5, 0, 0, 0, 0, 0, 0, -5,
-        0, 0, 0, 5, 5, 0, 0, 0
+        [-31, -21, -25, -13, -27, -22, -2, -17],
+        [-20, -13, -11, -5, -15, -2, 12, -19],
+        [-14, -8, -1, -4, -4, -6, 16, -1],
+        [-5, 6, 3, -6, 3, 12, 18, 9]
     ],
     // KNIGHTS
     [
-        -50, -40, -30, -30, -30, -30, -40, -50,
-        -40, -20, 0, 0, 0, 0, -20, -40,
-        -30, 0, 10, 15, 15, 10, 0, -30,
-        -30, 5, 15, 20, 20, 15, 5, -30,
-        -30, 0, 15, 20, 20, 15, 0, -30,
-        -30, 5, 10, 15, 15, 10, 5, -30,
-        -40, -20, 0, 5, 5, 0, -20, -40,
-        -50, -40, -30, -30, -30, -30, -40, -50
+        [-175, -77, -61, -35, -34, -9, -67, -201],
+        [-92, -41, -17, -8, -13, -22, -27, -83],
+        [-74, -27, 6, 40, 44, 58, 4, -56],
+        [-73, -15, 12, 49, 51, 53, 37, -26]
     ],
     // BISHOPS
     [
-        -20, -10, -10, -10, -10, -10, -10, -20,
-        -10, 0, 0, 0, 0, 0, 0, -10,
-        -10, 0, 5, 10, 10, 5, 0, -10,
-        -10, 5, 5, 10, 10, 5, 5, -10,
-        -10, 0, 10, 10, 10, 10, 0, -10,
-        -10, 10, 10, 10, 10, 10, 10, -10,
-        -10, 5, 0, 0, 0, 0, 5, -10,
-        -20, -10, -10, -10, -10, -10, -10, -20
+        [-53, -15, -7, -5, -12, -16, -17, -48],
+        [-5, 8, 21, 11, 29, 6, -14, 1],
+        [-8, 19, -5, 25, 22, 1, 5, -14],
+        [-23, 4, 17, 39, 31, 11, 0, -23]
     ],
     // QUEENS
     [
-        -20, -10, -10, -5, -5, -10, -10, -20,
-        -10, 0, 0, 0, 0, 0, 0, -10,
-        -10, 0, 5, 5, 5, 5, 0, -10,
-        -5, 0, 5, 5, 5, 5, 0, -5,
-        0, 0, 5, 5, 5, 5, 0, -5,
-        -10, 5, 5, 5, 5, 5, 0, -10,
-        -10, 0, 5, 0, 0, 0, 0, -10,
-        -20, -10, -10, -5, -5, -10, -10, -20
+        [3, -3, -3, 4, 0, -4, -5, -2],
+        [-5, 5, 6, 5, 14, 10, 6, -2],
+        [-5, 8, 13, 9, 12, 6, 10, 1],
+        [4, 12, 7, 8, 5, 8, 8, -2]
     ],
     // KINGS
     [
-        20, 30, 10, 0, 0, 10, 30, 20,
-        20, 20, 0, 0, 0, 0, 20, 20,
-        -10, -20, -20, -20, -20, -20, -20, -10,
-        -20, -30, -30, -40, -40, -30, -30, -20,
-        -30, -40, -40, -50, -50, -40, -40, -30,
-        -30, -40, -40, -50, -50, -40, -40, -30,
-        -30, -40, -40, -50, -50, -40, -40, -30,
-        -30, -40, -40, -50, -50, -40, -40, -30
+        [271, 278, 195, 164, 154, 123, 88, 59],
+        [327, 303, 258, 190, 179, 145, 120, 89],
+        [271, 234, 169, 138, 105, 81, 65, 45],
+        [198, 179, 120, 98, 70, 31, 33, -1],
     ],
-    // PAWNS
-    [
-        0, 0, 0, 0, 0, 0, 0, 0,
-        50, 50, 50, 50, 50, 50, 50, 50,
-        10, 10, 20, 30, 30, 20, 10, 10,
-        5, 5, 10, 25, 25, 10, 5, 5,
-        0, 0, 0, 20, 20, 0, 0, 0,
-        5, -5, -10, 0, 0, -10, -5, 5,
-        5, 10, 10, -20, -20, 10, 10, 5,
-        0, 0, 0, 0, 0, 0, 0, 0
-    ]
-]; */
+];
+
+const PAWN_SQUARE_TABLE_MIDGAME: [[i32; 8]; 8] = [
+    [0, 3, -9, -4, 13, 5, -7, 0],
+    [0, 3, -15, -23, 0, -12, 7, 0],
+    [0, 10, 11, 6, -13, -7, -4, 0],
+    [0, 19, 15, 20, 1, 22, -13, 0],
+    [0, 16, 32, 40, 11, -8, 5, 0],
+    [0, 19, 22, 17, -2, -5, -16, 0],
+    [0, 7, 5, 4, -13, -8, 10, 0],
+    [0, -5, -22, -8, 5, -8, -8, 0]
+];
 
 // Phase values for calculation of phase value for tapered evaluation
 // For now, these values are taken from Stockfish
@@ -180,6 +162,7 @@ fn get_midgame_evaluation(pos: &mut Position) -> i32 {
     let mut evaluation_score = 0;
     let pos_flipped = pos.colorflip();
     evaluation_score += get_piece_value_midgame(pos) as i32 - get_piece_value_midgame(&pos_flipped) as i32;
+    evaluation_score += get_piece_square_table_value_midgame(pos) - get_piece_square_table_value_midgame(&pos_flipped);
     evaluation_score
 }
 
@@ -188,6 +171,26 @@ fn get_endgame_evaluation(pos: &mut Position) -> i32 {
     let pos_flipped = pos.colorflip();
     evaluation_score += get_piece_value_endgame(pos) as i32 - get_piece_value_endgame(&pos_flipped) as i32;
     evaluation_score
+}
+
+fn get_piece_square_table_value_midgame(pos: &Position) -> i32 {
+    let mut psqt_score = 0;
+    for piece in 0..6 {
+        let mut piece_value = 0;
+        let piece_bitboard = pos.piece_bitboards[piece] & pos.color_bitboards[0];
+        for square in 0..64 {
+            if !(piece_bitboard & BitBoard::from_square(Square::index(square))).is_empty() {
+                let rank = cmp::min(7- square/8, square / 8);
+                let file = square % 8;
+                match piece {
+                    5 => piece_value += PAWN_SQUARE_TABLE_MIDGAME[rank as usize][file as usize],
+                    _ => piece_value += PIECE_SQUARE_TABLES_MIDGAME[piece][rank as usize][file as usize]
+                }
+            }
+        }
+        psqt_score += piece_value;
+    }
+    psqt_score
 }
 
 fn get_piece_value_midgame(pos: &Position) -> u32 {
