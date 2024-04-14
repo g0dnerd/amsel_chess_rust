@@ -8,36 +8,105 @@ use crate::movegen;
 use rand::seq::SliceRandom;
 
 // Passes updated attack bitboards to the position struct from the given position and move
-pub fn attacks_from_square(pos: &mut Position, from: Square, to: Square) {
-    let mut attacks = BitBoard::empty();
+pub fn attacks_after_move(pos: &mut Position, from: Square, to: Square) {
+    let mut moves = BitBoard::empty();
     if let Some(piece) = pos.piece_at(to) {
         match piece.0 {
-            0 => attacks = movegen::get_rook_moves(to, pos),
-            1 => attacks = movegen::get_knight_moves(to, pos),
-            2 => attacks = movegen::get_bishop_moves(to, pos),
-            3 => attacks = movegen::get_queen_moves(to, pos),
-            4 => attacks = movegen::get_king_moves(to, pos),
-            5 => attacks = movegen::pawn_attacks(pos, to),
+            0 => {
+                moves = movegen::get_rook_moves(to, pos);
+                moves ^= pos.color_bitboards[piece.1 as usize]; 
+            },
+            1 => {
+                moves = movegen::get_knight_moves(to, pos);
+                moves ^= pos.color_bitboards[piece.1 as usize];
+            },
+            2 => {
+                moves = movegen::get_bishop_moves(to, pos);
+                moves ^= pos.color_bitboards[piece.1 as usize];
+            },
+            3 => {
+                moves = movegen::get_queen_moves(to, pos);
+                moves ^= pos.color_bitboards[piece.1 as usize];
+            },
+            4 => {
+                moves = movegen::get_king_moves(to, pos);
+                moves ^= pos.color_bitboards[piece.1 as usize];
+            },
+            5 => {
+                moves = movegen::pawn_attacks(pos, to);
+                moves ^= pos.color_bitboards[piece.1 as usize];
+            },
             _ => (),
         }
-        pos.update_attacks_from_square(from, to, attacks);
+        pos.update_attacks_from_square(from, to, moves);
     }
 }
 
-// Updates the blockers for all sliders in the given bitboard
-pub fn update_slider_blockers(pos: &mut Position, affected: BitBoard) {
-    let mut blockers = BitBoard::empty();
-    for square in affected.squares_from_bb() {
-        if let Some(piece) = pos.piece_at(square) {
-            match piece.0 {
-                0 => blockers |= movegen::get_actual_blockers(&[(0, 1), (0, -1), (1, 0), (-1, 0)], square, pos),
-                2 => blockers |= movegen::get_actual_blockers(&[(1, 1), (1, -1), (-1, 1), (-1, -1)], square, pos),
-                3 => blockers |= movegen::get_actual_blockers(&[(1, 1), (1, -1), (-1, 1), (-1, -1), (0, 1), (0, -1), (1, 0), (-1, 0)], square, pos),
+pub fn update_slider_blockers(pos: &mut Position, square: Square) {
+    for i in 0..64 {
+        if pos.piece_bitboards[0].contains(Square::index(i)) ||
+                pos.piece_bitboards[2].contains(Square::index(i)) ||
+                pos.piece_bitboards[3].contains(Square::index(i)) {
+            match pos.piece_at(Square::index(i)).unwrap().0 {
+                0 => {
+                    let blockers = 
+                        movegen::get_first_actual_blockers(&[(0, 1), (0, -1), (1, 0), (-1, 0)], square, pos);
+                    pos.update_slider_blockers(square, blockers);
+                },
+                2 => {
+                    let blockers = 
+                        movegen::get_first_actual_blockers(&[(1, 1), (1, -1), (-1, 1), (-1, -1)], square, pos);
+                    pos.update_slider_blockers(square, blockers);
+                },
+                3 => {
+                    let blockers = 
+                        movegen::get_first_actual_blockers(&[(1, 1), (1, -1), (-1, 1), (-1, -1), (0, 1), (0, -1), (1, 0), (-1, 0)], 
+                        square, pos);
+                    pos.update_slider_blockers(square, blockers);
+                },
                 _ => (),
             }
-            pos.update_slider_blockers(square, blockers);
         }
     }
+
+}
+
+pub fn is_blocking_slider(pos: &mut Position, square: Square) -> BitBoard {
+    let mut blocked_sliders = BitBoard::empty();
+    for i in 0..64 {
+        if pos.piece_bitboards[0].contains(Square::index(i)) ||
+                pos.piece_bitboards[2].contains(Square::index(i)) ||
+                pos.piece_bitboards[3].contains(Square::index(i)) {
+            match pos.piece_at(Square::index(i)).unwrap().0 {
+                0 => {
+                    let blockers =
+                        movegen::get_first_actual_blockers(&[(0, 1), (0, -1), (1, 0), (-1, 0)], Square::index(i), pos);
+                    if blockers.contains(square) {
+                        blocked_sliders |= BitBoard::from_square(Square::index(i));
+                        pos.update_slider_blockers(square, blockers);
+                    }
+                },
+                2 => {
+                    let blockers =
+                        movegen::get_first_actual_blockers(&[(1, 1), (1, -1), (-1, 1), (-1, -1)], Square::index(i), pos);
+                    if blockers.contains(square) {
+                        blocked_sliders |= BitBoard::from_square(Square::index(i));
+                        pos.update_slider_blockers(square, blockers);
+                    }
+                },
+                3 => {
+                    let blockers =
+                        movegen::get_first_actual_blockers(&[(1, 1), (1, -1), (-1, 1), (-1, -1), (0, 1), (0, -1), (1, 0), (-1, 0)], Square::index(i), pos);
+                    if blockers.contains(square) {
+                        blocked_sliders |= BitBoard::from_square(Square::index(i));
+                        pos.update_slider_blockers(square, blockers);
+                    }
+                },
+                _ => return BitBoard::empty(),
+            }
+        }
+    }
+    blocked_sliders
 }
 
 // Updates the attacked pieces for all sliders in the given bitboard
@@ -46,9 +115,18 @@ pub fn update_slider_attacks(pos: &mut Position, affected: BitBoard) {
     for square in affected.squares_from_bb() {
         if let Some(piece) = pos.piece_at(square) {
             match piece.0 {
-                0 => attacks = movegen::get_rook_moves(square, pos),
-                2 => attacks = movegen::get_bishop_moves(square, pos),
-                3 => attacks = movegen::get_queen_moves(square, pos),
+                0 => {
+                    attacks = movegen::get_rook_moves(square, pos);
+                    attacks ^= pos.color_bitboards[piece.1 as usize];
+                },
+                2 => {
+                    attacks = movegen::get_bishop_moves(square, pos);
+                    attacks ^= pos.color_bitboards[piece.1 as usize];
+                },
+                3 => {
+                    attacks = movegen::get_queen_moves(square, pos);
+                    attacks ^= pos.color_bitboards[piece.1 as usize];
+                },
                 _ => (),
             }
             pos.update_attacks_from_square(square, square, attacks);
@@ -66,8 +144,10 @@ pub fn make_player_move(pos: &mut Position, from: Square, to: Square) -> Result<
         return Err("Illegal move: no piece on origin square.");
     }
 
-    let legal_moves = 
-        movegen::get_all_legal_moves_for_color(pos.state.active_player, pos);
+    let legal_moves = match pos.check {
+        false => movegen::get_all_legal_moves_for_color(pos.state.active_player, pos),
+        true => movegen::get_legal_moves_from_check(pos.state.active_player, pos),
+    };
     
     if legal_moves.is_empty() {
         match pos.state.active_player {
@@ -104,7 +184,7 @@ pub fn make_player_move(pos: &mut Position, from: Square, to: Square) -> Result<
     }
 
     // Bitboard of sliders that no longer have the path blocked by the moved piece
-    let freed_sliders = pos.is_blocking_slider(from);
+    let freed_sliders = is_blocking_slider(pos, from);
     let is_slider = (pos.piece_bitboards[0] | pos.piece_bitboards[2] | pos.piece_bitboards[3]).contains(from);
     let is_pawn = pos.piece_bitboards[5].contains(from);
     pos.make_move(&from, &to);
@@ -113,43 +193,43 @@ pub fn make_player_move(pos: &mut Position, from: Square, to: Square) -> Result<
     if from == Square::E1 && to == Square::G1 {
         pos.make_move(&Square::H1, &Square::F1);
         update_slider_attacks(pos, BitBoard::from_square(Square::F1));
-        update_slider_blockers(pos, BitBoard::from_square(Square::F1));
+        update_slider_blockers(pos, Square::F1);
     } else if from == Square::E1 && to == Square::C1 {
         pos.make_move(&Square::A1, &Square::D1);
         update_slider_attacks(pos, BitBoard::from_square(Square::D1));
-        update_slider_blockers(pos, BitBoard::from_square(Square::D1));
+        update_slider_blockers(pos, Square::D1);
     } else if from == Square::E8 && to == Square::G8 {
         pos.make_move(&Square::H8, &Square::F8);
         update_slider_attacks(pos, BitBoard::from_square(Square::F8));
-        update_slider_blockers(pos, BitBoard::from_square(Square::F8));
+        update_slider_blockers(pos, Square::F8);
     } else if from == Square::E8 && to == Square::C8 {
         pos.make_move(&Square::A8, &Square::D8);
         update_slider_attacks(pos, BitBoard::from_square(Square::D8));
-        update_slider_blockers(pos, BitBoard::from_square(Square::D8));
+        update_slider_blockers(pos, Square::D8);
     }
     
     // Bitboard of sliders that now have their path blocked by the moved piece
-    let blocked_sliders = pos.is_blocking_slider(to);
+    let blocked_sliders = is_blocking_slider(pos, to);
 
     // If there are any sliders that are no longer blocked, update their attack and blocker maps
     if !freed_sliders.is_empty() {
         pos.slider_blockers[from as usize] = BitBoard::empty();
         update_slider_attacks(pos, freed_sliders);
-        update_slider_blockers(pos, freed_sliders);
+        update_slider_blockers(pos, to);
     }
     // If there are newly blocked sliders, update their attack and blocker maps
     if !blocked_sliders.is_empty() {
-        update_slider_blockers(pos, blocked_sliders);
+        update_slider_blockers(pos, to);
         update_slider_attacks(pos, blocked_sliders);
     }
     // If the moved piece is a slider, update its attack and blocker maps
     if is_slider {
         pos.slider_blockers[from as usize] = BitBoard::empty();
-        update_slider_blockers(pos, BitBoard::from_square(to));
+        update_slider_blockers(pos, to);
         update_slider_attacks(pos, BitBoard::from_square(to));
     } else {
         // Update the attack map for the moved piece
-        attacks_from_square(pos, from, to);
+        attacks_after_move(pos, from, to);
     }
 
     // Check for promotion, auto-promote to queen for now. Update slider blockers and attacks for the new queen
@@ -159,7 +239,7 @@ pub fn make_player_move(pos: &mut Position, from: Square, to: Square) -> Result<
             types::Color::White => {
                 if rank == Rank::Eighth {
                     pos.promote_pawn(to, types::Piece::QUEEN);
-                    update_slider_blockers(pos, BitBoard::from_square(to));
+                    update_slider_blockers(pos, to);
                     update_slider_attacks(pos, BitBoard::from_square(to));
                     println!("Blockers for new slider have been updated: {:?}", pos.slider_blockers);
                     println!("Attackers have been updated: {:?}", pos.attack_bitboards);
@@ -168,7 +248,7 @@ pub fn make_player_move(pos: &mut Position, from: Square, to: Square) -> Result<
             types::Color::Black => {
                 if rank == Rank::First {
                     pos.promote_pawn(to, types::Piece::QUEEN);
-                    update_slider_blockers(pos, BitBoard::from_square(to));
+                    update_slider_blockers(pos, to);
                     update_slider_attacks(pos, BitBoard::from_square(to));
                     println!("Blockers for new slider have been updated: {:?}", pos.slider_blockers);
                     println!("Attackers have been updated: {:?}", pos.attack_bitboards);
@@ -239,32 +319,32 @@ pub fn make_random_engine_move(pos: &mut Position) -> Option<GameResult> {
     println!("AI move: {:?} {:?}", from, target_square);
 
     // Bitboard of sliders that no longer have their path blocked by the moved piece
-    let blocked_sliders = pos.is_blocking_slider(*from);
+    let blocked_sliders = is_blocking_slider(pos, *from);
     let is_slider = (pos.piece_bitboards[0] | pos.piece_bitboards[2] | pos.piece_bitboards[3]).contains(*from);
     let is_pawn = pos.piece_bitboards[5].contains(*from);
     pos.make_move(from, target_square);
     
     // Bitboard of sliders that now have their path blocked by the moved piece
-    let affected_sliders = pos.is_blocking_slider(*target_square);
+    let affected_sliders = is_blocking_slider(pos, *target_square);
 
     // If there are any sliders that are no longer blocked, update their attack and blocker maps
     if !blocked_sliders.is_empty() {
         update_slider_attacks(pos, blocked_sliders);
-        update_slider_blockers(pos, blocked_sliders);
+        update_slider_blockers(pos, *target_square);
     }
     // If there are newly blocked sliders, update their attack and blocker maps
     if !affected_sliders.is_empty() {
-        update_slider_blockers(pos, affected_sliders);
+        update_slider_blockers(pos, *target_square);
         update_slider_attacks(pos, affected_sliders);
     }
     // If the moved piece is a slider, update its attack and blocker maps
     if is_slider {
         pos.slider_blockers[*from as usize] = BitBoard::empty();
-        update_slider_blockers(pos, BitBoard::from_square(*target_square));
+        update_slider_blockers(pos, *target_square);
         update_slider_attacks(pos, BitBoard::from_square(*target_square));
     } else {        
         // Update the attack map for the moved piece
-        attacks_from_square(pos, *from, *target_square);
+        attacks_after_move(pos, *from, *target_square);
     }
         
     // Check for promotion, auto-promote to queen for now. Update slider blockers and attacks for the new queen
@@ -274,14 +354,14 @@ pub fn make_random_engine_move(pos: &mut Position) -> Option<GameResult> {
             types::Color::White => {
                 if rank == Rank::Eighth {
                     pos.promote_pawn(*target_square, types::Piece::QUEEN);
-                    update_slider_blockers(pos, BitBoard::from_square(*target_square));
+                    update_slider_blockers(pos, *target_square);
                     update_slider_attacks(pos, BitBoard::from_square(*target_square));
                 }
             },
             types::Color::Black => {
                 if rank == Rank::First {
                     pos.promote_pawn(*target_square, types::Piece::QUEEN);
-                    update_slider_blockers(pos, BitBoard::from_square(*target_square));
+                    update_slider_blockers(pos, *target_square);
                     update_slider_attacks(pos, BitBoard::from_square(*target_square));
                 }
             }
@@ -304,23 +384,23 @@ pub fn would_give_check(pos: &mut Position, start: &Square, end: &Square) -> boo
     let color = new_pos.piece_at(*start).unwrap().1;
 
     // List of sliders that after the move no longer have their path blocker by the moved piece
-    let blocked_sliders = new_pos.is_blocking_slider(*start);
+    let blocked_sliders = is_blocking_slider(pos, *start);
     let is_slider = (pos.piece_bitboards[0] | pos.piece_bitboards[2] | pos.piece_bitboards[3]).contains(*start);
     new_pos.make_move(start, end);
 
     // If the moved piece was blocking a slider, update those sliders
     if !blocked_sliders.is_empty() {
         update_slider_attacks(&mut new_pos, blocked_sliders);
-        update_slider_blockers(&mut new_pos, blocked_sliders);
+        update_slider_blockers(&mut new_pos, *end);
     }
 
     if is_slider {
         new_pos.slider_blockers[*start as usize] = BitBoard::empty();
-        update_slider_blockers(&mut new_pos, BitBoard::from_square(*end));
+        update_slider_blockers(&mut new_pos, *end);
         update_slider_attacks(&mut new_pos, BitBoard::from_square(*end)); 
     } else {
         // update attackers for the moved piece
-        attacks_from_square(&mut new_pos, *start, *end);
+        attacks_after_move(&mut new_pos, *start, *end);
     }
 
     // If after these updates, the enemy king is in the list of attacked squares, the move gives check
@@ -353,7 +433,7 @@ pub fn is_in_checkmate(pos: &mut Position) -> bool {
 
 pub fn make_specific_engine_move(pos: &mut Position, from: Square, target_square: Square) -> Option<GameResult> {
     // Bitboard of sliders that no longer have their path blocked by the moved piece
-    let blocked_sliders = pos.is_blocking_slider(from);
+    let blocked_sliders = is_blocking_slider(pos, from);
     let is_slider = (pos.piece_bitboards[0] | pos.piece_bitboards[2] | pos.piece_bitboards[3]).contains(from);
     let is_pawn = pos.piece_bitboards[5].contains(from);
         
@@ -363,42 +443,42 @@ pub fn make_specific_engine_move(pos: &mut Position, from: Square, target_square
     if from == Square::E1 && target_square == Square::G1 {
         pos.make_move(&Square::H1, &Square::F1);
         update_slider_attacks(pos, BitBoard::from_square(Square::F1));
-        update_slider_blockers(pos, BitBoard::from_square(Square::F1));
+        update_slider_blockers(pos, Square::F1);
     } else if from == Square::E1 && target_square == Square::C1 {
         pos.make_move(&Square::A1, &Square::D1);
         update_slider_attacks(pos, BitBoard::from_square(Square::D1));
-        update_slider_blockers(pos, BitBoard::from_square(Square::D1));
+        update_slider_blockers(pos, Square::D1);
     } else if from == Square::E8 && target_square == Square::G8 {
         pos.make_move(&Square::H8, &Square::F8);
         update_slider_attacks(pos, BitBoard::from_square(Square::F8));
-        update_slider_blockers(pos, BitBoard::from_square(Square::F8));
+        update_slider_blockers(pos, Square::F8);
     } else if from == Square::E8 && target_square == Square::C8 {
         pos.make_move(&Square::A8, &Square::D8);
         update_slider_attacks(pos, BitBoard::from_square(Square::D8));
-        update_slider_blockers(pos, BitBoard::from_square(Square::D8));
+        update_slider_blockers(pos, Square::D8);
     }
     
     // Bitboard of sliders that now have their path blocked by the moved piece
-    let affected_sliders = pos.is_blocking_slider(target_square);
+    let affected_sliders = is_blocking_slider(pos, target_square);
     
     // If there are any sliders that are no longer blocked, update their attack and blocker maps
     if !blocked_sliders.is_empty() {
         update_slider_attacks(pos, blocked_sliders);
-        update_slider_blockers(pos, blocked_sliders);
+        update_slider_blockers(pos, target_square);
     }
     // If there are newly blocked sliders, update their attack and blocker maps
     if !affected_sliders.is_empty() {
-        update_slider_blockers(pos, affected_sliders);
+        update_slider_blockers(pos, target_square);
         update_slider_attacks(pos, affected_sliders);
     }
     // If the moved piece is a slider, update its attack and blocker maps
     if is_slider {
         pos.slider_blockers[from as usize] = BitBoard::empty();
-        update_slider_blockers(pos, BitBoard::from_square(target_square));
+        update_slider_blockers(pos, target_square);
         update_slider_attacks(pos, BitBoard::from_square(target_square));
     } else {
         // If not yet done, update the attack map for the moved piece
-        attacks_from_square(pos, from, target_square);
+        attacks_after_move(pos, from, target_square);
     }
         
     // Check for promotion, auto-promote to queen for now. Update slider blockers and attacks for the new queen
@@ -408,14 +488,14 @@ pub fn make_specific_engine_move(pos: &mut Position, from: Square, target_square
             types::Color::White => {
                 if rank == Rank::Eighth {
                     pos.promote_pawn(target_square, types::Piece::QUEEN);
-                    update_slider_blockers(pos, BitBoard::from_square(target_square));
+                    update_slider_blockers(pos, target_square);
                     update_slider_attacks(pos, BitBoard::from_square(target_square));
                 }
             },
             types::Color::Black => {
                 if rank == Rank::First {
                     pos.promote_pawn(target_square, types::Piece::QUEEN);
-                    update_slider_blockers(pos, BitBoard::from_square(target_square));
+                    update_slider_blockers(pos, target_square);
                     update_slider_attacks(pos, BitBoard::from_square(target_square));
                 }
             }

@@ -279,6 +279,10 @@ impl Position {
 
         self.move_history.push((*from, *to));
 
+        // Assert that the color bitboards match the piece bitboards
+        assert_eq!(self.color_bitboards[0] | self.color_bitboards[1],
+            self.piece_bitboards[0] | self.piece_bitboards[1] | self.piece_bitboards[2] | self.piece_bitboards[3] | self.piece_bitboards[4] | self.piece_bitboards[5],
+            "Inconsistent position initialization. Color bitboards do not match piece bitboards.");
         // TODO: update en passant square
     }
 
@@ -374,26 +378,6 @@ impl Position {
             }
         }
         affected
-    }
-
-    pub fn is_blocking_slider(&self, square: Square) -> BitBoard {
-        let mut blocked_sliders = BitBoard::empty();
-        if self.attacked_by_black | self.attacked_by_white == BitBoard::empty() {
-            return blocked_sliders;
-        }
-        for i in 0..64 {
-            if self.slider_blockers[i].contains(square) {
-                if let Some(piece) = self.piece_at(Square::index(i)) {
-                    match piece.0 {
-                        0 => blocked_sliders |= BitBoard::from_square(Square::index(i)),
-                        2 => blocked_sliders |= BitBoard::from_square(Square::index(i)),
-                        3 => blocked_sliders |= BitBoard::from_square(Square::index(i)),
-                        _ => (),
-                    }
-                }
-            }            
-        }
-        blocked_sliders
     }
     
     pub fn update_slider_blockers(&mut self, square: Square, blockers: BitBoard) {

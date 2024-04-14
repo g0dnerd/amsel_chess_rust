@@ -88,8 +88,18 @@ fn main() {
                     if o == [99, 99] {
                         continue;
                     } else if o == [98, 98] {
-                        println!("Legal moves: {:?}", engine::movegen::get_all_legal_moves_for_color(pos.state.active_player, &mut pos));
-                        continue;
+                        match pos.check {
+                            true => {
+                                println!("Legal moves from check: {:?}",
+                                    engine::movegen::get_legal_moves_from_check(pos.state.active_player, &mut pos));
+                                continue;
+                            },
+                            false => {
+                                println!("Legal moves: {:?}",
+                                    engine::movegen::get_all_legal_moves_for_color(pos.state.active_player, &mut pos));
+                                continue;
+                            },
+                        }
                     }
                     else if o == [97, 97] {
                         println!("Engine is making a move.");
