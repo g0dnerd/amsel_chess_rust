@@ -6,10 +6,13 @@ use crate::evaluation;
 use crate::movegen;
 use std::time::Instant;
 use std::cmp;
+use std::thread;
+use std::sync::{Arc, Mutex};
 
 // The NegaMax algorithm is a variant of the minimax algorithm that is used to find the best move in a two-player, zero-sum game.
 
-const MAX_DEPTH: i32 = 4;
+const MAX_DEPTH: i32 = 5;
+const NUM_THREADS: usize = 4;
 
 // Returns all legal moves for the current position ordered by rough likelihood of being played
 fn order_moves(mut moves: Vec<(Square, Square)>, pos: &mut Position) -> Vec<(Square, Square)> {
@@ -63,41 +66,56 @@ fn alphabeta(pos: &mut Position, depth: u8, mut alpha: i32, mut beta: i32, maxim
 
 pub fn find_best_move(pos: &mut Position) -> (Square, Square) {
     let start_time = Instant::now();
-    let mut best_move = (Square::A1, Square::A1);
     let legal_moves = order_moves(movegen::get_all_legal_moves_for_color(pos.state.active_player, pos), pos);
     let maximizing_player = match pos.state.active_player {
         types::Color::White => true,
         types::Color::Black => false,
     };
     
-    let mut alpha = i32::MIN + 1;
+    let alpha = i32::MIN + 1;
     let beta = i32::MAX - 1;    
 
     if legal_moves.len() == 1 {
         return legal_moves[0];
     }
 
-    for (square, target_square) in legal_moves.iter() {
-        let mut new_pos = pos.clone();
-        game::make_specific_engine_move(&mut new_pos, *square, *target_square);
-        let score = match maximizing_player {
-            true => alphabeta(&mut new_pos, MAX_DEPTH as u8, alpha, beta, !maximizing_player),
-            false => -alphabeta(&mut new_pos, MAX_DEPTH as u8, alpha, beta, !maximizing_player),
-        };
-        if score == i32::MAX {
-            let end_time = Instant::now();
-            let elapsed_time = end_time.duration_since(start_time);
-            println!("Time to find engine move at depth {}: {:?}", MAX_DEPTH, elapsed_time);
-            return (*square, *target_square);
-        }
-        if score > alpha {
-            alpha = score;
-            best_move = (*square, *target_square);
-        }
+    let chunk_size = legal_moves.len() / NUM_THREADS;
+    let mut chunks = Vec::new();
+    for chunk in legal_moves.chunks(chunk_size) {
+        chunks.push(chunk.to_vec());
     }
+
+    let mut threads = vec![];
+    let shared_pos = Arc::new(Mutex::new(pos.clone()));
+
+    for chunk in chunks {
+        let shared_pos = shared_pos.clone();
+        let handle = thread::spawn(move || {
+            let mut best_move = (Square::A1, Square::A1);
+            let mut local_alpha = alpha;
+            for (square, target_square) in chunk {
+                let mut new_pos = shared_pos.lock().unwrap().clone();
+                game::make_specific_engine_move(&mut new_pos, square, target_square);
+                let score = alphabeta(&mut new_pos, MAX_DEPTH as u8, local_alpha, beta, !maximizing_player);
+                if score > local_alpha {
+                    local_alpha = score;
+                    best_move = (square, target_square);
+                }
+            }
+            best_move
+        });
+        threads.push(handle);
+    }
+    
+    // Wait for all threads to finish
+    let mut best_move = (Square::A1, Square::A1);
+    for thread in threads {
+        let result = thread.join().unwrap();
+        best_move = result;
+    }
+
     let end_time = Instant::now();
     let elapsed_time = end_time.duration_since(start_time);
     println!("Time to find engine move at depth {}: {:?}", MAX_DEPTH, elapsed_time);
-    println!("High score was {}", alpha);
     best_move
 }
