@@ -31,6 +31,7 @@ pub struct Position {
     castling_rights_history: Vec<CastlingRights>,
     halfmove_clock_history: Vec<u8>,
     pub piece_giving_check: Option<Square>,
+    pub check: bool,
 }
 
 impl Position {
@@ -116,7 +117,8 @@ impl Position {
 
         let move_history = Vec::new();
         let piece_giving_check = None;
-        
+        let check = false;
+
         Self {
             color_bitboards: bitboards,
             piece_bitboards: piece_boards,
@@ -130,6 +132,7 @@ impl Position {
             halfmove_clock_history,
             move_history,
             piece_giving_check,
+            check,
         }    
 
     }
@@ -169,10 +172,8 @@ impl Position {
             Color::Black
         };
         
-        let piece = if let Some(piece_index) = 
-            (0..=5).find(|&i| self.piece_bitboards[i].0 & mask != 0) {
-
-            match piece_index {
+        let piece = match (0..=5).find(|&i| self.piece_bitboards[i].0 & mask != 0) {
+            Some(piece_index) => match piece_index {
                 0 => Piece::ROOK,
                 1 => Piece::KNIGHT,
                 2 => Piece::BISHOP,
@@ -180,9 +181,8 @@ impl Position {
                 4 => Piece::KING,
                 5 => Piece::PAWN,
                 _ => panic!("Invalid piece index"),
-            }
-        } else {
-            return None;
+            },
+            None => return None,
         };
         
         Some((piece, color_mask))
@@ -382,7 +382,7 @@ impl Position {
             return blocked_sliders;
         }
         for i in 0..64 {
-            if self.attack_bitboards[i].contains(square) {
+            if self.slider_blockers[i].contains(square) {
                 if let Some(piece) = self.piece_at(Square::index(i)) {
                     match piece.0 {
                         0 => blocked_sliders |= BitBoard::from_square(Square::index(i)),

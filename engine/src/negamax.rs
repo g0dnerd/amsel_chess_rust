@@ -16,7 +16,7 @@ fn order_moves(mut moves: Vec<(Square, Square)>, pos: &mut Position) -> Vec<(Squ
     moves.shuffle(&mut rand::thread_rng());
     moves.sort_by_key(|&(start, end)| {
         match () {
-            () if game::is_check(pos, &start, &end) => 0,
+            () if game::would_give_check(pos, &start, &end) => 0,
             () if pos.is_capture(&end) => 1,
             () if pos.is_promotion(&start, &end) => 2,
             _ => 3,
@@ -28,6 +28,7 @@ fn order_moves(mut moves: Vec<(Square, Square)>, pos: &mut Position) -> Vec<(Squ
 fn alphabeta(pos: &mut Position, depth: u8, mut alpha: i32, mut beta: i32, maximizing: bool) -> i32 {
     if depth == 0 || !pos.state.game_result.is_ongoing() {
         let terminal_node_score = evaluation::main_evaluation(pos);
+        // println!("Returning line {:?} with score {}", pos.move_history, terminal_node_score);
         return terminal_node_score;
     }
     let legal_moves = order_moves(movegen::get_all_legal_moves_for_color(pos.state.active_player, pos), pos);

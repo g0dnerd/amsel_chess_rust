@@ -330,6 +330,7 @@ pub fn get_all_legal_moves_for_color(color: Color, pos: &mut Position) -> Vec<(S
     for (square, target_square) in moves.iter() {
         let mut new_pos = pos.clone();
         let is_king = new_pos.piece_bitboards[4].contains(*square);
+        let is_slider = (new_pos.piece_bitboards[0] | new_pos.piece_bitboards[2] | new_pos.piece_bitboards[3]).contains(*square);
 
         // List of sliders that after the move no longer have their path blocker by the moved piece
         let blocked_sliders = new_pos.is_blocking_slider(*square);
@@ -337,13 +338,10 @@ pub fn get_all_legal_moves_for_color(color: Color, pos: &mut Position) -> Vec<(S
 
         // Bitboard of squares of sliders that now have their path blocked by the new pieces
         let affected_sliders = new_pos.is_blocking_slider(*target_square);
-
-        // update attackers for the moved piece
-        game::attacks_from_square(&mut new_pos, *square, *target_square);
-
+        // println!("Sliders at {:?} would no longer be blocked by move {:?} {:?}", affected_sliders.squares_from_bb(), square, target_square);
+        
         // If the moved piece was blocking a slider, update those sliders
         if !blocked_sliders.is_empty() {
-            // new_pos.slider_blockers[*square as usize] = BitBoard::empty();
             game::update_sliders(&mut new_pos, blocked_sliders);                
         }
 
@@ -355,8 +353,15 @@ pub fn get_all_legal_moves_for_color(color: Color, pos: &mut Position) -> Vec<(S
                 moves_to_remove.push((*square, *target_square));
                 continue;
             }
-            // new_pos.slider_blockers[*square as usize] = BitBoard::empty();
             game::update_sliders(&mut new_pos, affected_sliders);
+        }
+
+        if is_slider {
+            new_pos.slider_blockers[*square as usize] = BitBoard::empty();
+            game::update_sliders(&mut new_pos, BitBoard::from_square(*square)); 
+        } else {
+            // update attackers for the moved piece
+            game::attacks_from_square(&mut new_pos, *square, *target_square);
         }
 
         // If after these updates, the king is in the list of attacked squares, the move is illegal
@@ -387,11 +392,11 @@ pub fn get_all_legal_moves_for_color(color: Color, pos: &mut Position) -> Vec<(S
 pub fn get_legal_moves_from_check(color: Color, pos: &mut Position) -> Vec<(Square, Square)> {
     let mut legal_moves: Vec<(Square, Square)> = get_all_legal_moves_for_color(color, pos);
     let mut moves_to_remove: Vec<(Square, Square)> = Vec::new();
-    let king_square = (pos.piece_bitboards[4] & pos.color_bitboards[color as usize]).squares_from_bb()[0];
     if let Some(attacking_square) = pos.piece_giving_check {
         for legal_move in legal_moves.iter() {
             let mut new_pos = pos.clone();
             new_pos.make_move(&legal_move.0, &legal_move.1);
+            let king_square = (new_pos.piece_bitboards[4] & new_pos.color_bitboards[color as usize]).squares_from_bb()[0];
             let blocked_sliders = new_pos.is_blocking_slider(legal_move.1);
             if new_pos.piece_at(legal_move.1) == Some((4, color)) {
                 match new_pos.piece_at(legal_move.1).unwrap().1 {

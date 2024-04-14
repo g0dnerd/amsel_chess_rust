@@ -25,7 +25,9 @@ fn main() {
                 }
             }
         }
-        println!("It is now {:?}'s turn.", pos.state.active_player);
+        /* println!("It is now {:?}'s turn.", pos.state.active_player);
+        game::make_engine_move(&mut pos);
+        break; */
 
         // Get user input in the format of "a1 a2"
         let mut input = String::new();
@@ -71,9 +73,9 @@ fn main() {
     }
 
     // Wait for the user to press enter before closing the program
-    let mut input = String::new();
+    /* let mut input = String::new();
     println!("Press enter to close the game.");
-    std::io::stdin().read_line(&mut input).unwrap();
+    std::io::stdin().read_line(&mut input).unwrap(); */
 
 }
 

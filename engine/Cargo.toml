@@ -13,3 +13,6 @@ rand = "0.8.5"
 [[bin]]
 name = "engine"
 path = "./src/main.rs"
+
+[profile.release]
+debug = true
