@@ -206,7 +206,7 @@ pub fn get_king_moves(square: Square, position: &Position) -> BitBoard {
     
     let color = position.piece_at(square).unwrap().1;
 
-    if position.state.castling_rights.0 != Castling::NO_CASTLING {
+    if position.state.castling_rights.0 != Castling::NO_CASTLING && !position.check {
         match color {
             Color::White => {
                 if position.state.castling_rights.0 & Castling::WHITE_KING_SIDE != Castling::NO_CASTLING {
@@ -285,6 +285,9 @@ pub fn get_pawn_moves(square: Square, position: &Position) -> BitBoard {
 }
 
 pub fn get_all_legal_moves_for_color(color: Color, pos: &mut Position) -> Vec<(Square, Square)> {
+    if pos.check {
+        return get_legal_moves_from_check(color, pos);
+    }
     let mut moves: Vec<(Square, Square)> = Vec::new();
 
     // Iterate over all squares with a piece of the given color
@@ -301,101 +304,118 @@ pub fn get_all_legal_moves_for_color(color: Color, pos: &mut Position) -> Vec<(S
             _ => BitBoard::empty(),
         };
 
-        for piece_move in piece_moves.squares_from_bb() {
-            moves.push((square, piece_move));
+        let mut piece_moves_iterator = piece_moves;
+        while !piece_moves_iterator.is_empty() {
+            let piece_move = piece_moves_iterator.trailing_zeros();
+            let square_index = piece_move as usize;
+            moves.push((square, Square::index(square_index)));
+            piece_moves_iterator.clear_lsb();
         }
     }
 
     // Iterate over all moves and remove those that would put or leave the king in check
     let mut moves_to_remove: Vec<(Square, Square)> = Vec::new();
-    for (square, target_square) in moves.iter() {
+    for (from, to) in moves.iter() {
         let mut new_pos = pos.clone();
-        let is_king = new_pos.piece_bitboards[4].contains(*square);
-        let is_slider = (new_pos.piece_bitboards[0] | new_pos.piece_bitboards[2] | new_pos.piece_bitboards[3]).contains(*square);
-
-        // List of sliders that after the move no longer have their path blocker by the moved piece
-        let blocked_sliders = game::is_blocking_slider(&mut new_pos, *square);
+        let is_pawn = new_pos.piece_at(*from).unwrap().0 == 5;
+        let is_king = new_pos.piece_at(*from).unwrap().0 == 4;
+        let mut attackers_to_update = BitBoard::empty();
 
         // Remove the move if it would castle through check
-        if pos.piece_at(*square).unwrap().0 == 4 {
-            if *square == Square::E1 && *target_square == Square::G1 {
-                if pos.attacked_by_black.contains(Square::F1) || pos.attacked_by_black.contains(Square::G1) {
-                    moves_to_remove.push((*square, *target_square));
+        if pos.piece_at(*from).unwrap().0 == 4 {
+            if *from == Square::E1 && *to == Square::G1 {
+                if pos.is_attacked_by_black(Square::F1) || pos.is_attacked_by_black(Square::G1) {
+                    moves_to_remove.push((*from, *to));
                     continue;
                 }
-            } else if *square == Square::E1 && *target_square == Square::B1 {
-                if pos.attacked_by_black.contains(Square::D1) ||
-                        pos.attacked_by_black.contains(Square::C1) ||
-                        pos.attacked_by_black.contains(Square::B1) {
-                    moves_to_remove.push((*square, *target_square));
+            } else if *from == Square::E1 && *to == Square::B1 {
+                if pos.is_attacked_by_black(Square::D1) ||
+                        pos.is_attacked_by_black(Square::C1) ||
+                        pos.is_attacked_by_black(Square::B1) {
+                    moves_to_remove.push((*from, *to));
                     continue;
                 }
-            } else if *square == Square::E8 && *target_square == Square::G8 {
-                if pos.attacked_by_white.contains(Square::F8) || pos.attacked_by_white.contains(Square::G8) {
-                    moves_to_remove.push((*square, *target_square));
+            } else if *from == Square::E8 && *to == Square::G8 {
+                if pos.is_attacked_by_white(Square::F8) || pos.is_attacked_by_white(Square::G8) {
+                    moves_to_remove.push((*from, *to));
                     continue;
                 }
-            } else if *square == Square::E8 && *target_square == Square::B8 {
-                if pos.attacked_by_white.contains(Square::D8) ||
-                        pos.attacked_by_white.contains(Square::C8) ||
-                        pos.attacked_by_white.contains(Square::B8) {
-                    moves_to_remove.push((*square, *target_square));
+            } else if *from == Square::E8 && *to == Square::B8 {
+                if pos.is_attacked_by_white(Square::D8) ||
+                        pos.is_attacked_by_white(Square::C8) ||
+                        pos.is_attacked_by_white(Square::B8) {
+                    moves_to_remove.push((*from, *to));
                     continue;
                 }
             }
         }
 
-        new_pos.make_move(&square, &target_square);
+        // List of sliders that after the move no longer have their path blocker by the moved piece
+        let freed_sliders = game::get_attacking_sliders(&mut new_pos, *from);
+        attackers_to_update |= freed_sliders;
 
-        // Bitboard of squares of sliders that now have their path blocked by the new pieces
-        let affected_sliders = game::is_blocking_slider(&mut new_pos, *target_square);
-        
-        // If the moved piece was blocking a slider, update those sliders
-        if !blocked_sliders.is_empty() {
-            game::update_slider_attacks(&mut new_pos, blocked_sliders);
-            // Update blockers for each slider that is no longer blocked
-            for slider in blocked_sliders.squares_from_bb() {
-                game::update_slider_blockers(pos, slider);
-            }             
+        new_pos.make_move(&from, &to);
+
+        // If the move is a castling move, move the rook as well
+        if is_king {
+            if *from == Square::E1 && *to == Square::G1 {
+                new_pos.make_move(&Square::H1, &Square::F1);
+                attackers_to_update |= BitBoard::from_square(Square::F1);
+                attackers_to_update ^= BitBoard::from_square(Square::H1);
+            } else if *from == Square::E1 && *to == Square::C1 {
+                new_pos.make_move(&Square::A1, &Square::D1);
+                attackers_to_update |= BitBoard::from_square(Square::D1);
+                attackers_to_update ^= BitBoard::from_square(Square::A1);
+            } else if *from == Square::E8 && *to == Square::G8 {
+                new_pos.make_move(&Square::H8, &Square::F8);
+                attackers_to_update |= BitBoard::from_square(Square::F8);
+                attackers_to_update ^= BitBoard::from_square(Square::H8);
+            } else if *from == Square::E8 && *to == Square::C8 {
+                new_pos.make_move(&Square::A8, &Square::D8);
+                attackers_to_update |= BitBoard::from_square(Square::D8);
+                attackers_to_update ^= BitBoard::from_square(Square::A8);
+            }
         }
 
-        // If the moved piece now blocks a slider, update those sliders
-        if !affected_sliders.is_empty() {
-            // If the moved piece is a king and is blocking an opposing slider, the move is illegal
-            if is_king && (affected_sliders & new_pos.color_bitboards[!color as usize] != BitBoard::empty()) {
-                // Flag only this move for removal
-                moves_to_remove.push((*square, *target_square));
-                continue;
+        // Check for promotion, auto-promote to queen for now. Update slider blockers and attacks for the new queen
+        if is_pawn {
+            let rank = to.rank();
+            match !pos.state.active_player {
+                types::Color::White => {
+                    if rank == types::square::Rank::Eighth {
+                        new_pos.promote_pawn(*to, types::Piece::QUEEN);
+                    }
+                },
+                types::Color::Black => {
+                    if rank == types::square::Rank::First {
+                        new_pos.promote_pawn(*to, types::Piece::QUEEN);
+                    }
+                }
             }
-            for slider in affected_sliders.squares_from_bb() {
-                game::update_slider_blockers(pos, slider);
-            }
-            game::update_slider_attacks(&mut new_pos, affected_sliders);
         }
 
-        if is_slider {
-            new_pos.slider_blockers[*square as usize] = BitBoard::empty();
-            game::update_slider_blockers(&mut new_pos, *target_square);
-            game::update_slider_attacks(&mut new_pos, BitBoard::from_square(*square));
+        attackers_to_update |= BitBoard::from_square(*to);
 
-        } else {
-            // update attackers for the moved piece
-            game::attacks_after_move(&mut new_pos, *square, *target_square);
+        // List of sliders that now have their path blocked by the moved piece
+        attackers_to_update |= game::get_attacking_sliders(&mut new_pos, *to);
+
+        if !attackers_to_update.is_empty() {
+            game::update_attackers(&mut new_pos, attackers_to_update);
         }
 
         // If after these updates, the king is in the list of attacked squares, the move is illegal
         match color {
             Color::White => {
                 let king_square = (new_pos.piece_bitboards[4] & new_pos.color_bitboards[0]).squares_from_bb()[0];
-                if new_pos.attacked_by_black.contains(king_square) {
-                    moves_to_remove.push((*square, *target_square));
+                if new_pos.is_attacked_by_black(king_square) {
+                    moves_to_remove.push((*from, *to));
                     continue;
                 }
             },
             Color::Black => {
                 let king_square = (new_pos.piece_bitboards[4] & new_pos.color_bitboards[1]).squares_from_bb()[0];
-                if new_pos.attacked_by_white.contains(king_square) {
-                    moves_to_remove.push((*square, *target_square));
+                if new_pos.is_attacked_by_white(king_square) {
+                    moves_to_remove.push((*from, *to));
                     continue;
                 }
             }
@@ -408,50 +428,68 @@ pub fn get_all_legal_moves_for_color(color: Color, pos: &mut Position) -> Vec<(S
 
 /* Movegen method with reduced scope since when in check, the only possible pieces with available moves are then king,
 / pieces that can capture the piece giving check or pieces that can block the check */
-pub fn get_legal_moves_from_check(color: Color, pos: &mut Position) -> Vec<(Square, Square)> {
-    let mut legal_moves: Vec<(Square, Square)> = get_all_legal_moves_for_color(color, pos);
-    let mut moves_to_remove: Vec<(Square, Square)> = Vec::new();
-    for legal_move in legal_moves.iter() {
-        let mut new_pos = pos.clone();
-        let is_slider = (new_pos.piece_bitboards[0] | new_pos.piece_bitboards[2] | new_pos.piece_bitboards[3]).contains(legal_move.0);
-        new_pos.make_move(&legal_move.0, &legal_move.1);
-        if is_slider {
-            game::update_slider_attacks(&mut new_pos, BitBoard::from_square(legal_move.1));
-            game::update_slider_blockers(&mut new_pos, legal_move.1);
-        }
-        let king_square = (new_pos.piece_bitboards[4] & new_pos.color_bitboards[color as usize]).squares_from_bb()[0];
-        let blocked_sliders = game::is_blocking_slider(&mut new_pos, legal_move.1);
-        let is_capture = new_pos.piece_at(legal_move.1).is_some();
+fn get_legal_moves_from_check(color: Color, pos: &mut Position) -> Vec<(Square, Square)> {
+    let mut moves: Vec<(Square, Square)> = Vec::new();
 
-        if !is_capture && blocked_sliders.is_empty() && new_pos.piece_at(legal_move.1).unwrap().0 != 4 {
-            moves_to_remove.push(*legal_move);
-            continue;
+    // Iterate over all squares with a piece of the given color
+    let squares = pos.color_bitboards[color as usize].squares_from_bb();
+    for square in squares {
+        let piece = pos.piece_at(square).unwrap().0;
+        let piece_moves = match piece {
+            0 => get_rook_moves(square, pos),
+            1 => get_knight_moves(square, pos),
+            2 => get_bishop_moves(square, pos),
+            3 => get_queen_moves(square, pos),
+            4 => get_king_moves(square, pos),
+            5 => get_pawn_moves(square, pos),
+            _ => BitBoard::empty(),
+        };
+
+        let mut piece_moves_iterator = piece_moves;
+        while !piece_moves_iterator.is_empty() {
+            let piece_move = piece_moves_iterator.trailing_zeros();
+            let square_index = piece_move as usize;
+            moves.push((square, Square::index(square_index)));
+            piece_moves_iterator.clear_lsb();
         }
-        if !blocked_sliders.is_empty() {
-            game::update_slider_attacks(&mut new_pos, blocked_sliders);
-            for slider in blocked_sliders.squares_from_bb() {
-                game::update_slider_blockers(&mut new_pos, slider);
-            }
+    }
+
+    // Iterate over all moves and remove those that don't end the check
+    let mut moves_to_remove: Vec<(Square, Square)> = Vec::new();
+    for (from, to) in moves.iter() {
+        let mut new_pos = pos.clone();
+        let mut attackers_to_update = BitBoard::empty();
+
+        new_pos.make_move(&from, &to);
+
+        attackers_to_update |= BitBoard::from_square(*to);
+
+        // List of sliders that now have their path blocked by the moved piece
+        attackers_to_update |= game::get_attacking_sliders(&mut new_pos, *to);
+
+        if !attackers_to_update.is_empty() {
+            game::update_attackers(&mut new_pos, attackers_to_update);
         }
-        
-        if new_pos.piece_at(legal_move.1) == Some((4, color)) {
-            match new_pos.piece_at(legal_move.1).unwrap().1 {
-                Color::White => {
-                    if new_pos.attacked_by_black.contains(king_square) {
-                        moves_to_remove.push(*legal_move);
-                        continue;
-                    }
-                },
-                Color::Black => {
-                    if new_pos.attacked_by_white.contains(king_square) {
-                        moves_to_remove.push(*legal_move);
-                        continue;
-                    }
+
+        // If after these updates, the king is in the list of attacked squares, the move is illegal
+        match color {
+            Color::White => {
+                let king_square = (new_pos.piece_bitboards[4] & new_pos.color_bitboards[0]).squares_from_bb()[0];
+                if new_pos.is_attacked_by_black(king_square) {
+                    moves_to_remove.push((*from, *to));
+                    continue;
                 }
-            
+            },
+            Color::Black => {
+                let king_square = (new_pos.piece_bitboards[4] & new_pos.color_bitboards[1]).squares_from_bb()[0];
+                if new_pos.is_attacked_by_white(king_square) {
+                    moves_to_remove.push((*from, *to));
+                    continue;
+                }
             }
         }
     }
-    legal_moves.retain(|&x| !moves_to_remove.contains(&x));
-    legal_moves
+    // Remove all tuples from moves that are in moves_to_remove
+    moves.retain(|&x| !moves_to_remove.contains(&x));
+    moves
 }

@@ -157,4 +157,12 @@ impl BitBoard {
         }
         flipped_self
     }
+
+    pub fn trailing_zeros(&self) -> u32 {
+        self.0.trailing_zeros()
+    }
+
+    pub fn clear_lsb(&mut self) {
+        self.0 &= self.0 - 1;
+    }
 } 

@@ -19,7 +19,7 @@ fn order_moves(mut moves: Vec<(Square, Square)>, pos: &mut Position) -> Vec<(Squ
     moves.shuffle(&mut rand::thread_rng());
     moves.sort_by_key(|&(start, end)| {
         match () {
-            () if game::would_give_check(pos, &start, &end) => 0,
+            () if game::would_give_check(pos, &start, &end) => 0, 
             () if pos.is_capture(&end) => 1,
             () if pos.is_promotion(&start, &end) => 2,
             _ => 3,
@@ -80,16 +80,13 @@ pub fn find_best_move(pos: &mut Position) -> (Square, Square) {
     }
 
     let chunk_size = legal_moves.len() / NUM_THREADS;
-    let mut chunks = Vec::new();
-    for chunk in legal_moves.chunks(chunk_size) {
-        chunks.push(chunk.to_vec());
-    }
+    let chunks: Vec<Vec<(Square, Square)>> = legal_moves.chunks(chunk_size).map(|chunk| chunk.to_vec()).collect();
 
-    let mut threads = vec![];
+    let mut handles = vec![];
     let shared_pos = Arc::new(Mutex::new(pos.clone()));
 
     for chunk in chunks {
-        let shared_pos = shared_pos.clone();
+        let shared_pos = Arc::clone(&shared_pos);
         let handle = thread::spawn(move || {
             let mut best_move = (Square::A1, Square::A1);
             let mut local_alpha = alpha;
@@ -102,20 +99,29 @@ pub fn find_best_move(pos: &mut Position) -> (Square, Square) {
                     best_move = (square, target_square);
                 }
             }
-            best_move
+            (best_move, local_alpha)
         });
-        threads.push(handle);
+        handles.push(handle);
     }
     
-    // Wait for all threads to finish
-    let mut best_move = (Square::A1, Square::A1);
-    for thread in threads {
-        let result = thread.join().unwrap();
-        best_move = result;
+    // Collect results from threads
+    let mut best_move = ((Square::A1, Square::A1), i32::MIN + 1);
+    for handle in handles {
+        match handle.join() {
+            Ok (result) => {
+                if result.1 > best_move.1 {
+                    best_move.0 = result.0;
+                }
+            },
+            Err(e) => {
+                println!("Error joining thread {:?}", e);
+            },
+        }
     }
 
     let end_time = Instant::now();
     let elapsed_time = end_time.duration_since(start_time);
     println!("Time to find engine move at depth {}: {:?}", MAX_DEPTH, elapsed_time);
-    best_move
+    best_move.0
 }
+

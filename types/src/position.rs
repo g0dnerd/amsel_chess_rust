@@ -22,9 +22,6 @@ pub struct Position {
     pub attacked_by_white: BitBoard,
     pub attacked_by_black: BitBoard,
 
-    // Contains information about blocked slider paths
-    pub slider_blockers: [BitBoard; 64],
-
     pub move_history: Vec<(Square, Square)>,
 
     was_last_move_capture: Option<u8>,
@@ -40,7 +37,6 @@ impl Position {
         let mut bitboards = [BitBoard::empty(); 2];
         let mut piece_boards = [BitBoard::empty(); 6];
         let mut attacks = [BitBoard::empty(); 64];
-        let mut slider_blockers = [BitBoard::empty(); 64];
 
         // Initialize the bitboard for both colors in their starting positions
         // White
@@ -96,18 +92,6 @@ impl Position {
         attacks[57] = BitBoard::from_u64(0b1010000000000000000000000000000000000000000);
         attacks[62] = BitBoard::from_u64(0b101000000000000000000000000000000000000000000000);
 
-        slider_blockers[0] = BitBoard::from_u64(0b100000010);
-        slider_blockers[2] = BitBoard::from_u64(0b101000000000);
-        slider_blockers[3] = BitBoard::from_u64(0b1110000010100);
-        slider_blockers[5] = BitBoard::from_u64(0b101000000000000);
-        slider_blockers[7] = BitBoard::from_u64(0b1000000001000000);
-
-        slider_blockers[56] = BitBoard::from_u64(0b1000000001000000000000000000000000000000000000000000000000);
-        slider_blockers[58] = BitBoard::from_u64(0b1010000000000000000000000000000000000000000000000000);
-        slider_blockers[59] = BitBoard::from_u64(0b1010000001000000000000000000000000000000000000000000000000000);
-        slider_blockers[61] = BitBoard::from_u64(0b1010000000000000000000000000000000000000000000000000000);
-        slider_blockers[63] = BitBoard::from_u64(0b100000010000000000000000000000000000000000000000000000000000000);
-
         let attacked_by_white = BitBoard::from_u64(0b111111110000000000000000);
         let attacked_by_black = BitBoard::from_u64(0b111111110000000000000000000000000000000000000000);
 
@@ -126,7 +110,6 @@ impl Position {
             attack_bitboards: attacks,
             attacked_by_white,
             attacked_by_black,
-            slider_blockers,
             was_last_move_capture: last_capture,
             castling_rights_history,
             halfmove_clock_history,
@@ -286,6 +269,57 @@ impl Position {
         // TODO: update en passant square
     }
 
+    pub fn make_castling_move(&mut self, from: &Square, to: &Square) {
+        let (piece, color) = self.piece_at(*from).unwrap();
+        let piece_index = match piece {
+            Piece::ROOK => 0,
+            Piece::KING => 4,
+            _ => panic!("Invalid piece"),
+        };
+
+        match to {
+            Square::C1 | Square::C8 => {
+                let rook_from = match color {
+                    Color::White => Square::A1,
+                    Color::Black => Square::A8,
+                };
+                let rook_to = match color {
+                    Color::White => Square::D1,
+                    Color::Black => Square::D8,
+                };
+                let rook_mask = BitBoard::from_square(rook_from);
+                let rook_to_mask = BitBoard::from_square(rook_to);
+                self.color_bitboards[color as usize] ^= rook_mask;
+                self.color_bitboards[color as usize] |= rook_to_mask;
+                self.piece_bitboards[piece_index] ^= rook_mask;
+                self.piece_bitboards[piece_index] |= rook_to_mask;
+            },
+            Square::G1 | Square::G8 => {
+                let rook_from = match color {
+                    Color::White => Square::H1,
+                    Color::Black => Square::H8,
+                };
+                let rook_to = match color {
+                    Color::White => Square::F1,
+                    Color::Black => Square::F8,
+                };
+                let rook_mask = BitBoard::from_square(rook_from);
+                let rook_to_mask = BitBoard::from_square(rook_to);
+                self.color_bitboards[color as usize] ^= rook_mask;
+                self.color_bitboards[color as usize] |= rook_to_mask;
+                self.piece_bitboards[piece_index] ^= rook_mask;
+                self.piece_bitboards[piece_index] |= rook_to_mask;
+            },
+            _ => panic!("Invalid castling move"),
+        }
+
+        self.move_history.push((*from, *to));
+        self.state.half_move_counter += 1;
+        self.halfmove_clock_history.push(self.state.half_move_counter);
+        self.attack_bitboards[*from as usize] = BitBoard::empty();
+
+    }
+
     /* pub fn unmake_move(&mut self, from: &Square, to: &Square) {
         // Find the piece that was moved
         let (piece, color) = self.piece_at(*to).unwrap();
@@ -332,19 +366,45 @@ impl Position {
         self.state.half_move_counter = self.halfmove_clock_history.pop().unwrap();
     }
  */
-    pub fn update_attacks_from_square(&mut self, from: Square, to: Square, attacks: BitBoard) {
-        self.attack_bitboards[from as usize] = BitBoard::empty();
-        self.attack_bitboards[to as usize] = attacks;
-        self.attacked_by_white = BitBoard::empty();
-        self.attacked_by_black = BitBoard::empty();
+
+    pub fn is_attacked_by_black(&mut self, square: Square) -> bool {
+        self.sync_attack_maps();
+        self.attacked_by_black.contains(square)
+    }
+
+    pub fn is_attacked_by_white(&mut self, square: Square) -> bool {
+        self.sync_attack_maps();
+        self.attacked_by_white.contains(square)
+    }
+
+    pub fn update_attack_maps(&mut self, attacker_square: Square, attacks: BitBoard) {
+        self.attack_bitboards[attacker_square as usize] = attacks;
+    }
+
+    fn sync_attack_maps(&mut self) {
+        let mut attacked_by_white = BitBoard::empty();
+        let mut attacked_by_black = BitBoard::empty();
+    
         for i in 0..64 {
-            if let Some(piece) = self.piece_at(Square::index(i)) {
-                match piece.1 {
-                    Color::White => self.attacked_by_white |= self.attack_bitboards[i],
-                    Color::Black => self.attacked_by_black |= self.attack_bitboards[i],
+            let attacker_bitboard = self.attack_bitboards[i];
+            let attacker_color_bitboard = self.color_bitboards[0];
+    
+            // Check if the attacker bitboard is non-empty
+            if !attacker_bitboard.is_empty() {
+                // Update the attacked_by_white if the attacker color is white
+                if attacker_color_bitboard.contains(Square::index(i)) {
+                    attacked_by_white |= attacker_bitboard;
+                } 
+                // Otherwise, update the attacked_by_black
+                else {
+                    attacked_by_black |= attacker_bitboard;
                 }
             }
         }
+    
+        // Update the class members directly
+        self.attacked_by_white = attacked_by_white;
+        self.attacked_by_black = attacked_by_black;
     }
 
     /* Returns true if the given square is under attack by the given color.
@@ -379,10 +439,6 @@ impl Position {
         }
         affected
     }
-    
-    pub fn update_slider_blockers(&mut self, square: Square, blockers: BitBoard) {
-        self.slider_blockers[square as usize] = blockers;
-    }
 
     pub fn is_promotion(&self, start: &Square, end: &Square) -> bool {
         let (piece, color) = self.piece_at(*start).unwrap();
@@ -397,7 +453,6 @@ impl Position {
     }
 
     pub fn promote_pawn(&mut self, square: Square, target_piece: u8) {
-        println!("Promoting pawn on square {:?}", square);
         let mask = BitBoard::from_square(square);
         let color = if self.color_bitboards[0].contains(square) {
             Color::White
