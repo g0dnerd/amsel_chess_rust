@@ -10,6 +10,7 @@ fn main() {
 
     // Main CLI Loop
     let mut pos = Position::new();
+    println!("Running at depth {}", engine::negamax::MAX_DEPTH);
     
     if args.len() > 1 {
         match args[1].as_str() {
@@ -22,7 +23,7 @@ fn main() {
                 return;
             },
             "benchmark" => {
-                for _ in 0..3 {
+                for _ in 0..1 {
                     pos.print_position();
                     game::make_engine_move(&mut pos);
                 }

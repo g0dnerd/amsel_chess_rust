@@ -11,7 +11,7 @@ use std::sync::{Arc, Mutex};
 
 // The NegaMax algorithm is a variant of the minimax algorithm that is used to find the best move in a two-player, zero-sum game.
 
-const MAX_DEPTH: i32 = 5;
+pub const MAX_DEPTH: i32 = 4;
 const NUM_THREADS: usize = 4;
 
 // Returns all legal moves for the current position ordered by rough likelihood of being played
