@@ -1,3 +1,5 @@
+use std::panic;
+
 use types::position::Position;
 use types::Color;
 use types::bitboard::BitBoard;
@@ -261,15 +263,34 @@ pub fn would_give_check(pos: &mut Position, from: &Square, to: &Square) -> bool 
     // If after these updates, the enemy king is in the list of attacked squares, the move gives check
     match !color {
         Color::White => {
-            let king_square = (new_pos.piece_bitboards[4] & new_pos.color_bitboards[0]).squares_from_bb()[0];
-            if new_pos.is_attacked_by_black(king_square) {
-                return true;
+            let king_square = 
+                panic::catch_unwind(|| (new_pos.piece_bitboards[4] & new_pos.color_bitboards[0]).squares_from_bb()[0]);
+            
+            match king_square {
+                Ok(king_square) => {
+                    if new_pos.is_attacked_by_black(king_square) {
+                        return true;
+                    }
+                },
+                Err(_) => {
+                    panic!("King square not found in would_give_check with move history {:?} and move {:?} {:?}",
+                        new_pos.move_history, from, to);
+                }
             }
         },
         Color::Black => {
-            let king_square = (new_pos.piece_bitboards[4] & new_pos.color_bitboards[1]).squares_from_bb()[0];
-            if new_pos.is_attacked_by_white(king_square) {
-                return true;
+            let king_square = 
+                panic::catch_unwind(|| (new_pos.piece_bitboards[4] & new_pos.color_bitboards[1]).squares_from_bb()[0]);
+            match king_square {
+                Ok(king_square) => {
+                    if new_pos.is_attacked_by_white(king_square) {
+                        return true;
+                    }
+                },
+                Err(_) => {
+                    panic!("King square not found in would_give_check with move history {:?} and move {:?} {:?}",
+                        new_pos.move_history, from, to);
+                }
             }
         }
     }

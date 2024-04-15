@@ -460,6 +460,8 @@ fn get_legal_moves_from_check(color: Color, pos: &mut Position) -> Vec<(Square, 
         let mut new_pos = pos.clone();
         let mut attackers_to_update = BitBoard::empty();
 
+        attackers_to_update |= game::get_attacking_sliders(&mut new_pos, *from);
+
         new_pos.make_move(&from, &to);
 
         attackers_to_update |= BitBoard::from_square(*to);
