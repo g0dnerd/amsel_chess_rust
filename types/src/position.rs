@@ -492,8 +492,9 @@ impl Position {
         for i in 0..6 {
             new_position.piece_bitboards[i] = self.piece_bitboards[i].colorflip();
         }
+        new_position.state.castling_rights = !self.state.castling_rights;
         new_position.state = self.state;
-        new_position.state.active_player = !self.state.active_player;
+        new_position.state.switch_active_player();
         new_position
     }
 

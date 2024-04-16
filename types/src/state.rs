@@ -1,5 +1,6 @@
 use crate::{Color, Castling, Results};
 use crate::square::Square;
+use std::ops::Not;
 
 /* A state depicts additional information that is necessary to evaluate a position:
 / Castling rights, en passant square, halfmove clock and the active player. */
@@ -75,5 +76,24 @@ impl CastlingRights {
 impl Default for CastlingRights {
     fn default() -> Self {
         Self(Castling::ANY_CASTLING)
+    }
+}
+
+impl Not for CastlingRights {
+    type Output = Self;
+
+    fn not(self) -> Self::Output {
+        let white_kingside = self.0 & 0b00010000;
+        let white_queenside = self.0 & 0b00100000;
+        let black_kingside = self.0 & 0b01000000;
+        let black_queenside = self.0 & 0b10000000;
+
+        let flipped_white_kingside = black_kingside >> 2;
+        let flipped_white_queenside = black_queenside >> 1;
+        let flipped_black_kingside = white_kingside << 2;
+        let flipped_black_queenside = white_queenside << 1;
+
+        let flipped_rights = flipped_black_kingside | flipped_black_queenside | flipped_white_kingside | flipped_white_queenside;
+        Self(flipped_rights)
     }
 }
