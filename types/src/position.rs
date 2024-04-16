@@ -191,6 +191,15 @@ impl Position {
                 Piece::PAWN => 5,
                 _ => panic!("Invalid piece"),
             };
+            if captured_piece_index == 0 {
+                match *to {
+                    Square::A8 => self.state.castling_rights.0 &= !Castling::BLACK_QUEEN_SIDE,
+                    Square::H8 => self.state.castling_rights.0 &= !Castling::BLACK_KING_SIDE,
+                    Square::A1 => self.state.castling_rights.0 &= !Castling::WHITE_QUEEN_SIDE,
+                    Square::H1 => self.state.castling_rights.0 &= !Castling::WHITE_KING_SIDE,
+                    _ => (),
+                }
+            }
             self.was_last_move_capture = Some(captured_piece);
             let to_mask = BitBoard::from_square(*to);
             self.color_bitboards[captured_color as usize] ^= to_mask;
