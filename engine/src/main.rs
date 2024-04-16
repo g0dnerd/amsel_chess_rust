@@ -33,7 +33,19 @@ fn main() {
                 println!("Running in 0 player mode.");
                 while pos.state.game_result.is_ongoing() {
                     pos.print_position();
-                    println!("Current evaluation: {}", evaluation::main_evaluation(&mut pos));
+                    let eval = evaluation::main_evaluation(&mut pos);
+                    if eval == i32::MIN + 1 || eval == i32::MAX - 1 {
+                        println!("Current evaluation: - (game over)");
+                    } else {
+                        match pos.state.active_player {
+                            types::Color::White => {
+                                println!("Current evaluation: {}", eval);
+                            },
+                            types::Color::Black => {
+                                println!("Current evaluation: {}", -eval);
+                            }
+                        }
+                    }
                     if game::is_in_checkmate(&mut pos) {
                         match pos.state.active_player {
                             types::Color::White => {
@@ -60,7 +72,19 @@ fn main() {
         println!("Running in 1 player mode.");
         while pos.state.game_result.is_ongoing() {
             pos.print_position();
-            println!("Current evaluation: {}", evaluation::main_evaluation(&mut pos));
+            let eval = evaluation::main_evaluation(&mut pos);
+            if eval == i32::MIN + 1 || eval == i32::MAX - 1 {
+                println!("Current evaluation: - (game over)");
+            } else {
+                match pos.state.active_player {
+                    types::Color::White => {
+                        println!("Current evaluation: {}", eval);
+                    },
+                    types::Color::Black => {
+                        println!("Current evaluation: {}", -eval);
+                    }
+                }
+            }
             if game::is_in_checkmate(&mut pos) {
                 match pos.state.active_player {
                     types::Color::White => {
@@ -94,7 +118,6 @@ fn main() {
                             continue;
                     }
                     else if o == [97, 97] {
-                        println!("Engine is making a move.");
                         game::make_engine_move(&mut pos);
                         continue;
                     }

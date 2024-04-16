@@ -70,13 +70,18 @@ pub fn main_evaluation(pos: &mut Position) -> i32 {
             return i32::MAX - 1;
         }
     }
+    let player_to_move = match pos.state.active_player {
+        types::Color::White => -1,
+        types::Color::Black => 1
+    };
+
     let midgame_evaluation = get_midgame_evaluation(pos);
     let mut endgame_evaluation = get_endgame_evaluation(pos);
     let phase = get_phase_value(pos) as i32;
     endgame_evaluation = endgame_evaluation * scale_factor(pos, endgame_evaluation) as i32 / 64;
     let evaluation = (midgame_evaluation * phase + ((endgame_evaluation * (128 - phase)))) / 128;
     // evaluation += tempo(pos);
-    evaluation
+    evaluation * player_to_move
 }
 
 // The scale factor scales down the weight of the endgame evaluation value in the main evaluation

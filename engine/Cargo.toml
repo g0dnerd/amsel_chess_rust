@@ -9,6 +9,7 @@ edition = "2021"
 types = { path = "../types" }
 precompute = { path = "../precompute" }
 rand = "0.8.5"
+indicatif = "0.17.8"
 
 [[bin]]
 name = "engine"
