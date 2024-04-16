@@ -2,6 +2,7 @@ use std::cmp;
 use types::position::Position;
 use types::bitboard::BitBoard;
 use types::square::Square;
+use crate::movegen;
 use crate::game;
 
 const PIECE_SQUARE_TABLES_MIDGAME: [[[i32; 8]; 4]; 5] = [
@@ -53,6 +54,23 @@ const PAWN_SQUARE_TABLE_MIDGAME: [[i32; 8]; 8] = [
     [0, -5, -22, -8, 5, -8, -8, 0]
 ];
 
+// Mobility bonus depending on how many squares a rook can reach (min. 0, max. 14)
+const ROOK_MOBILITY_BONUS_TABLE_MIDGAME: [i32; 15] = [
+    -60, -20, 2, 3, 3, 11, 22, 31, 40, 40, 41, 48, 57, 57, 62
+];
+// Mobility bonus depending on how many squares a knight can reach (min. 0, max. 8)
+const KNIGHT_MOBILITY_BONUS_TABLE_MIDGAME: [i32; 9] = [
+    -62, -53, -12, -4, 3, 13, 22, 28, 33
+];
+// Mobility bonus depending on how many squares a bishop can reach (min. 0, max. 13)
+const BISHOP_MOBILITY_BONUS_TABLE_MIDGAME: [i32; 14] = [
+    -48, -20, 16, 26, 38, 51, 55, 63, 63, 68, 81, 81, 91, 98
+];
+// Mobility bonus depending on how many squares a queen can reach (min. 0, max. 27)
+const QUEEN_MOBILITY_BONUS_TABLE_MIDGAME: [i32; 28] = [
+    -30, -12, -8, -9, 20, 23, 23, 35, 38, 53, 64, 65, 65, 66, 67, 67, 72, 72, 77, 79, 93, 108, 108, 108, 110, 114, 114, 116
+];
+
 // Phase values for calculation of phase value for tapered evaluation
 // For now, these values are taken from Stockfish
 const MIDGAME_LIMIT: u32 = 15258;
@@ -95,7 +113,7 @@ fn scale_factor(pos: &mut Position, endgame_evaluation: i32) -> u32 {
 
     let mut scale_factor: u32 = 64;
     let pawn_count_white = (pos_white.piece_bitboards[5] & pos_white.color_bitboards[0]).count_ones();
-    // let pawn_count_black = (pos_black.piece_bitboards[5] & pos_black_flipped.color_bitboards[0]).count_ones();
+    let pawn_count_black = (pos_black.piece_bitboards[5] & pos_black.color_bitboards[0]).count_ones();
     let queen_count_white = (pos_white.piece_bitboards[3] & pos_white.color_bitboards[0]).count_ones();
     let queen_count_black = (pos_black.piece_bitboards[3] & pos_black.color_bitboards[0]).count_ones();
     let bishop_count_white = (pos_white.piece_bitboards[2] & pos_white.color_bitboards[0]).count_ones();
@@ -122,23 +140,68 @@ fn scale_factor(pos: &mut Position, endgame_evaluation: i32) -> u32 {
         }
     }
 
-    // If there is only one queen on the board
-    if queen_count_white + queen_count_black == 1 {
-        // And it belongs to white
-        if queen_count_white == 1 {
-            // Set the scale factor to 37 + 3 * amount of black's minor pieces
-            scale_factor = 37 + 3 * (bishop_count_black + knight_count_black);
+    // If the scale factor has not been changed yet during this evaluation
+    if scale_factor == 64 {
+        let opposite_bishops = opposite_bishops(pos);
+        if opposite_bishops && non_pawn_material_white == MATERIAL_VALUES_MIDGAME[2] && non_pawn_material_black == MATERIAL_VALUES_MIDGAME[2] {
+            scale_factor = 22 /* + 4 * candidate_passed(pos_white) */
+        } else if opposite_bishops {
+            scale_factor = 22 + 3 * piece_count(&pos_white);
         } else {
-            // If the queen belongs to black, do the same for white
-            scale_factor = 37 + 3 * (bishop_count_white + knight_count_white);
+            // If both white's and black's non pawn material are worth as much as a bishop and if both players control the same amount of pawns
+            if non_pawn_material_white == MATERIAL_VALUES_MIDGAME[0] && non_pawn_material_black == MATERIAL_VALUES_MIDGAME[0] && pawn_count_white - pawn_count_black <= 1 {
+                let mut pawn_king_black = false;
+                let mut pcw_flank = [0, 0];
+                let mut pos_iterator = pos_white.color_bitboards[0] | pos_black.color_bitboards[0];
+                // Iterate over all occupied squares in the position
+                while pos_iterator != BitBoard::empty() {
+                    let index = pos_iterator.trailing_zeros() as usize;
+                    // If the square is occupied by a white pawn
+                    if pos_white.color_bitboards[0] & pos_white.piece_bitboards[5] & BitBoard::from_index(index) != BitBoard::empty() {
+                        let array_index = if index / 8 < 4 {1} else {0};
+                        // Note the pawn flank
+                        pcw_flank[array_index] = 1;
+                    }
+                    // If the square is occupied by a black king
+                    if pos_black.color_bitboards[0] & pos_black.piece_bitboards[4] & BitBoard::from_index(index) != BitBoard::empty() {
+                        // For each direction
+                        for delta in [(1, 0), (-1, 0), (0, 1), (0, -1)].iter() {
+                            let new_index = index as i32 + delta.0 * 8 + delta.1;
+                            if new_index < 0 || new_index > 63 {
+                                continue;
+                            }
+                            // If the square is occupied by a black pawn
+                            if pos_black.color_bitboards[0] & pos_black.piece_bitboards[5] & BitBoard::from_index(new_index as usize) != BitBoard::empty() {
+                                // Note that a black pawn is next to the black king
+                                pawn_king_black = true;
+                                break;
+                            }
+                        }
+                    }
+                    pos_iterator.clear_lsb();
+                }
+                // If the pawn flank is different and there is an opposite color pawn next to the opposite color king, scale down to 36
+                if pcw_flank[0] != pcw_flank[1] && pawn_king_black {
+                    return 36;
+                }
+            }
+            // If there is only one queen on the board
+            if queen_count_white + queen_count_black == 1 {
+                // And it belongs to white
+                if queen_count_white == 1 {
+                    // Set the scale factor to 37 + 3 * amount of black's minor pieces
+                    scale_factor = 37 + 3 * (bishop_count_black + knight_count_black);
+                } else {
+                    // If the queen belongs to black, do the same for white
+                    scale_factor = 37 + 3 * (bishop_count_white + knight_count_white);
+                }
+            } else {
+                // If the total queen amount is different from 2, choose the smaller value between the current scale factor
+                // and 36 + 7 * white's pawn amount
+                scale_factor = cmp::min(scale_factor, 36 + 7 * pawn_count_white);
+            }
         }
-    } else {
-        // If the total queen amount is different from 2, choose the smaller value between the current scale factor
-        // and 36 + 7 * white's pawn amount
-        scale_factor = cmp::min(scale_factor, 36 + 7 * pawn_count_white);
     }
-
-    // TODO: Opposite Bishops, Passed pawns, Pawn flanks, etc.
 
     scale_factor    
 }    
@@ -168,6 +231,12 @@ fn get_midgame_evaluation(pos: &mut Position) -> i32 {
     let pos_flipped = pos.colorflip();
     evaluation_score += get_piece_value_midgame(pos) as i32 - get_piece_value_midgame(&pos_flipped) as i32;
     evaluation_score += get_piece_square_table_value_midgame(pos) - get_piece_square_table_value_midgame(&pos_flipped);
+    evaluation_score += get_mobility_score(pos, true) as i32 - get_mobility_score(&pos_flipped, true) as i32;
+    // TODO: pawn structure: isolated, backward, doubled, connected, chained, etc.
+    // TODO: piece safety
+    // TODO: passed pawns
+    // TODO: space
+    // TODO: king safety score
     evaluation_score
 }
 
@@ -178,24 +247,149 @@ fn get_endgame_evaluation(pos: &mut Position) -> i32 {
     evaluation_score
 }
 
+fn piece_count(pos: &Position) -> u32 {
+    pos.color_bitboards[0].count_ones()
+}
+
 fn get_piece_square_table_value_midgame(pos: &Position) -> i32 {
     let mut psqt_score = 0;
     for piece in 0..6 {
-        let mut piece_value = 0;
         let piece_bitboard = pos.piece_bitboards[piece] & pos.color_bitboards[0];
         for square in 0..64 {
             if !(piece_bitboard & BitBoard::from_square(Square::index(square))).is_empty() {
                 let rank = cmp::min(7- square/8, square / 8);
                 let file = square % 8;
                 match piece {
-                    5 => piece_value += PAWN_SQUARE_TABLE_MIDGAME[rank as usize][file as usize],
-                    _ => piece_value += PIECE_SQUARE_TABLES_MIDGAME[piece][rank as usize][file as usize]
+                    5 => psqt_score += PAWN_SQUARE_TABLE_MIDGAME[rank as usize][file as usize],
+                    _ => psqt_score += PIECE_SQUARE_TABLES_MIDGAME[piece][rank as usize][file as usize]
                 }
             }
         }
-        psqt_score += piece_value;
     }
     psqt_score
+}
+
+fn get_mobility_score(pos: &Position, midgame: bool) -> i32 {
+    let mobility_range = get_mobility_range(pos);
+    let mut mobility_score = 0;
+    let mut iterator = pos.color_bitboards[0];
+    while !iterator.is_empty() {
+        let index = iterator.trailing_zeros() as usize;
+        let square = Square::index(index);
+        let mobility = get_mobility(pos, &square, mobility_range);
+        let piece = pos.piece_at(Square::index(index)).unwrap().0;
+        match piece {
+            0 => {
+                if midgame {
+                    mobility_score += ROOK_MOBILITY_BONUS_TABLE_MIDGAME[mobility as usize];
+                } else {
+                    todo!()
+                }
+            },
+            1 => {
+                if midgame {
+                    mobility_score += KNIGHT_MOBILITY_BONUS_TABLE_MIDGAME[mobility as usize];
+                } else {
+                    todo!()
+                }
+            },
+            2 => {
+                if midgame {
+                    mobility_score += BISHOP_MOBILITY_BONUS_TABLE_MIDGAME[mobility as usize];
+                } else {
+                    todo!()
+                }
+            },
+            3 => {
+                if midgame {
+                    mobility_score += QUEEN_MOBILITY_BONUS_TABLE_MIDGAME[mobility as usize];
+                } else {
+                    todo!()
+                }
+            },
+            _ => ()
+        }
+        iterator.clear_lsb();
+    }
+    
+    mobility_score
+} 
+
+fn get_mobility(pos: &Position, square: &Square, mobility_range: BitBoard) -> u32 {
+    if let Some((piece, _color)) = pos.piece_at(*square) {
+        match piece {
+            0 => {
+                let mut moves = movegen::get_first_actual_blockers(&[(0, 1), (0, -1), (1, 0), (-1, 0)], Square::index(*square as usize), pos);
+                // Remove all squares that are not within our mobility range
+                moves &= mobility_range;
+                return moves.count_ones();
+            },                    
+            1 => {
+                let mut moves = movegen::get_pseudolegal_knight_moves(Square::index(*square as usize));
+                // Remove all squares that are not within our mobility range
+                moves &= mobility_range;
+                return moves.count_ones();
+            },
+            2 => {
+                let mut moves = movegen::get_first_actual_blockers(&[(1, 1), (1, -1), (-1, 1), (-1, -1)], Square::index(*square as usize), pos);
+                moves &= mobility_range;
+                return moves.count_ones();
+            },
+            3 => {
+                let mut moves = movegen::get_first_actual_blockers(&[(0, 1), (0, -1), (1, 0), (-1, 0), (1, 1), (1, -1), (-1, 1), (-1, -1)], Square::index(*square as usize), pos);
+                // Remove all squares that are occupied by our own queens
+                moves &= mobility_range;
+                return moves.count_ones();
+            },
+            _ => ()
+        }
+    }
+    0
+}
+
+fn is_in_mobility_area(pos: &Position, square: &Square) -> bool {
+    // If the target square is occupied by our own king or queen, return false
+    if pos.color_bitboards[0] & pos.piece_bitboards[4] & BitBoard::from_square(*square) != BitBoard::empty() {
+        return false;
+    }
+    if pos.color_bitboards[0] & pos.piece_bitboards[3] & BitBoard::from_square(*square) != BitBoard::empty() {
+        return false;
+    }
+    // If the square is protected by an enemy pawn, return false
+    if let Some(offset_square) = square.try_offset(-1, 1) {
+        if pos.color_bitboards[1] & pos.piece_bitboards[5] & BitBoard::from_square(offset_square) != BitBoard::empty() {
+            return false;
+        }
+    }
+    if let Some(offset_square) = square.try_offset(1, 1) {
+        if pos.color_bitboards[1] & pos.piece_bitboards[5] & BitBoard::from_square(offset_square) != BitBoard::empty() {
+            return false;
+        }
+    }
+    // If the square is on the 2nd or 3rd rank and is occupied by our own pawn, return false
+    if pos.color_bitboards[0] & pos.piece_bitboards[5] & BitBoard::from_square(*square) != BitBoard::empty() &&
+        *square as usize / 8 < 4 {
+            return false;
+    }
+    // TODO: exclude blockers for king from the mobility area
+    true
+}
+
+fn get_mobility_range(pos: &Position) -> BitBoard {
+    let mut mobility_range = BitBoard::from_u64(0xffffffffffffffff);
+    let queen = pos.piece_bitboards[3] & pos.color_bitboards[0];
+    let king = pos.piece_bitboards[4] & pos.color_bitboards[0];
+    mobility_range ^= queen ^ king;
+    let mut mobility_range_iterator = mobility_range;
+    while !mobility_range_iterator.is_empty() {
+        let index = mobility_range_iterator.trailing_zeros() as usize;
+        let square = Square::index(index);
+        if !is_in_mobility_area(pos, &square) {
+            mobility_range &= !BitBoard::from_square(square);
+        }
+        mobility_range_iterator.clear_lsb();
+    }
+    mobility_range
 }
 
 fn get_piece_value_midgame(pos: &Position) -> u32 {
@@ -222,4 +416,32 @@ fn get_material_value(pos: &Position, midgame: bool) -> u32 {
         }
     }
     total_piece_value
+}
+
+/* Material imbalance describes the concept of pieces not only having a static value assignment (like 1-3-3-5-9), but
+considering what other pieces are on the board as well */
+/* fn material_imbalance(pos: &Position) {
+    let mut imbalance = 0;
+    v += 
+
+} */
+
+// Returns true if the position contains a bishop pair from the view of the white player
+/* fn bishop_pair(pos: &Position) -> u32 {
+    if (pos.piece_bitboards[2] & pos.color_bitboards[0]).count_ones() < 2 {
+        return 0;
+    }
+    1438
+} */
+
+// Returns true if the position contains opposite bishops (white vs dark squares)
+fn opposite_bishops(pos: &Position) -> bool {
+    if pos.piece_bitboards[2].count_ones() != 2 {
+        return false;
+    }
+    let white_bishops = pos.piece_bitboards[2] & pos.color_bitboards[0];
+    let black_bishops = pos.piece_bitboards[2] & pos.color_bitboards[1];
+    let white_bishop_square = white_bishops.trailing_zeros() % 8;
+    let black_bishop_square = black_bishops.trailing_zeros() % 8;
+    white_bishop_square % 2 != black_bishop_square % 2
 }

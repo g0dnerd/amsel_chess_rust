@@ -72,6 +72,25 @@ pub fn slider_moves(square: Square, blockers: BitBoard, directions: &[(i8, i8)])
     moves
 }
 
+pub fn get_pseudolegal_knight_moves(square: Square) -> BitBoard {
+    let mut moves = BitBoard::empty();
+    for &(dx, dy) in &[
+        (1, 2),
+        (2, 1),
+        (1, -2),
+        (2, -1),
+        (-1, 2),
+        (-2, 1),
+        (-1, -2),
+        (-2, -1),
+    ] {
+        if let Some(offset_by_delta) = square.try_offset(dx, dy) {
+            moves |= BitBoard::from_square(offset_by_delta);
+        }
+    }
+    moves
+}
+
 pub fn pawn_attacks(position: &mut Position, square: Square) -> BitBoard {
     let mut moves = BitBoard::empty();
     let color = position.piece_at(square).unwrap().1;
@@ -154,27 +173,7 @@ pub fn get_queen_moves_from_blockers(square: Square, blockers: BitBoard) -> BitB
 }
 
 pub fn get_knight_moves(square: Square, position: &Position) -> BitBoard {
-    // Handle potential errors when trying to unwrap a piece from an empty square
-    let piece = position.piece_at(square);
-    match piece {
-        None => panic!("get_knight_moves called on empty square"),
-        _ => (),
-    }
-    let mut moves = BitBoard::empty();
-    for &(dx, dy) in &[
-        (1, 2),
-        (2, 1),
-        (1, -2),
-        (2, -1),
-        (-1, 2),
-        (-2, 1),
-        (-1, -2),
-        (-2, -1),
-    ] {
-        if let Some(offset_by_delta) = square.try_offset(dx, dy) {
-            moves |= BitBoard::from_square(offset_by_delta);
-        }
-    }
+    let mut moves = get_pseudolegal_knight_moves(square);
     let color = position.piece_at(square).unwrap().1;
     moves = moves & !position.color_bitboards[color as usize];
     moves
