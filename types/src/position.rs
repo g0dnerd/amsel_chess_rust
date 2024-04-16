@@ -1,7 +1,7 @@
 use crate::bitboard::BitBoard;
 use crate::square::Square;
 use crate::{Color, Castling, Results, get_piece_representation};
-use crate::state::{State, GameResult, CastlingRights};
+use crate::state::{State, GameResult, /* CastlingRights */};
 use crate::Piece;
 
 /* A position contains the minimum amount of information necessary
@@ -24,10 +24,10 @@ pub struct Position {
 
     pub move_history: Vec<(Square, Square)>,
 
-    was_last_move_capture: Option<u8>,
+   /*  was_last_move_capture: Option<u8>,
     castling_rights_history: Vec<CastlingRights>,
     halfmove_clock_history: Vec<u8>,
-    pub piece_giving_check: Option<Square>,
+    pub piece_giving_check: Option<Square>, */
     pub check: bool,
 }
 
@@ -95,12 +95,12 @@ impl Position {
         let attacked_by_white = BitBoard::from_u64(0b111111110000000000000000);
         let attacked_by_black = BitBoard::from_u64(0b111111110000000000000000000000000000000000000000);
 
-        let last_capture = None;
-        let castling_rights_history = Vec::new();
-        let halfmove_clock_history = Vec::new();
+        // let last_capture = None;
+        // let castling_rights_history = Vec::new();
+        // let halfmove_clock_history = Vec::new();
 
         let move_history = Vec::new();
-        let piece_giving_check = None;
+        // let piece_giving_check = None;
         let check = false;
 
         Self {
@@ -110,11 +110,11 @@ impl Position {
             attack_bitboards: attacks,
             attacked_by_white,
             attacked_by_black,
-            was_last_move_capture: last_capture,
+            /* was_last_move_capture: last_capture,
             castling_rights_history,
-            halfmove_clock_history,
+            halfmove_clock_history, */
             move_history,
-            piece_giving_check,
+            /* piece_giving_check, */
             check,
         }    
 
@@ -200,20 +200,20 @@ impl Position {
                     _ => (),
                 }
             }
-            self.was_last_move_capture = Some(captured_piece);
+            // self.was_last_move_capture = Some(captured_piece);
             let to_mask = BitBoard::from_square(*to);
             self.color_bitboards[captured_color as usize] ^= to_mask;
             self.piece_bitboards[captured_piece_index] ^= to_mask;
         } else {
             self.state.half_move_counter += 1;
-            self.halfmove_clock_history.push(self.state.half_move_counter);
+            // self.halfmove_clock_history.push(self.state.half_move_counter);
         }
         
         // If the move was not a capture, edit the flag accordingly
-        self.was_last_move_capture = None;
+        // self.was_last_move_capture = None;
         
         // Update castling rights
-        self.castling_rights_history.push(self.state.castling_rights);
+        // self.castling_rights_history.push(self.state.castling_rights);
         match piece {
             Piece::KING => {
                 match color {
@@ -241,7 +241,7 @@ impl Position {
             },
             Piece::PAWN => {
                 self.state.half_move_counter = 0;
-                self.halfmove_clock_history.push(self.state.half_move_counter);
+                // self.halfmove_clock_history.push(self.state.half_move_counter);
             }
             _ => (),
         }
@@ -324,7 +324,7 @@ impl Position {
 
         self.move_history.push((*from, *to));
         self.state.half_move_counter += 1;
-        self.halfmove_clock_history.push(self.state.half_move_counter);
+        // self.halfmove_clock_history.push(self.state.half_move_counter);
         self.attack_bitboards[*from as usize] = BitBoard::empty();
 
     }
