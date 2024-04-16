@@ -96,7 +96,11 @@ pub fn main_evaluation(pos: &mut Position) -> i32 {
     let midgame_evaluation = get_midgame_evaluation(pos);
     let mut endgame_evaluation = get_endgame_evaluation(pos);
     let phase = get_phase_value(pos) as i32;
-    endgame_evaluation = endgame_evaluation * scale_factor(pos, endgame_evaluation) as i32 / 64;
+    let scale_factor = scale_factor(pos, endgame_evaluation);
+    endgame_evaluation = endgame_evaluation * scale_factor as i32 / 64;
+    /* println!("Phase: {}", phase);
+    println!("Scale factor: {}", scale_factor);
+    println!("Midgame evaluation: {}, Endgame evaluation: {}", midgame_evaluation, endgame_evaluation); */
     let evaluation = (midgame_evaluation * phase + ((endgame_evaluation * (128 - phase)))) / 128;
     // evaluation += tempo(pos);
     evaluation * player_to_move
@@ -210,7 +214,9 @@ fn scale_factor(pos: &mut Position, endgame_evaluation: i32) -> u32 {
 fn get_phase_value(pos: &mut Position) -> u32 {
     let pos_flipped = pos.colorflip();
     let mut non_pawn_material = get_npm(pos) + get_npm(&pos_flipped);
+    // println!("npm before ceiling: {}", non_pawn_material);
     non_pawn_material = cmp::max(ENDGAME_LIMIT, cmp::min(non_pawn_material, MIDGAME_LIMIT));
+    // println!("Non pawn material: {}", non_pawn_material);
     ((non_pawn_material - ENDGAME_LIMIT) * 128) / (MIDGAME_LIMIT - ENDGAME_LIMIT)
 }
 
@@ -221,7 +227,7 @@ fn get_npm(pos: &Position) -> u32 {
         if piece == 5 {
             continue;
         }
-        npm += (pos.piece_bitboards[piece] & pos.color_bitboards[0]).count_ones();
+        npm += (pos.piece_bitboards[piece] & pos.color_bitboards[0]).count_ones() * MATERIAL_VALUES_MIDGAME[piece];
     }
     npm
 }
@@ -231,7 +237,11 @@ fn get_midgame_evaluation(pos: &mut Position) -> i32 {
     let pos_flipped = pos.colorflip();
     evaluation_score += get_piece_value_midgame(pos) as i32 - get_piece_value_midgame(&pos_flipped) as i32;
     evaluation_score += get_piece_square_table_value_midgame(pos) - get_piece_square_table_value_midgame(&pos_flipped);
-    evaluation_score += get_mobility_score(pos, true) as i32 - get_mobility_score(&pos_flipped, true) as i32;
+    let white_mobility = get_mobility_score(pos, true) as i32;
+    let black_mobility = get_mobility_score(&pos_flipped, true) as i32;
+    // println!("White mobility: {}, Black mobility: {}", white_mobility, black_mobility);
+    evaluation_score += white_mobility - black_mobility;
+    // evaluation_score += get_mobility_score(pos, true) as i32 - get_mobility_score(&pos_flipped, true) as i32;
     // TODO: pawn structure: isolated, backward, doubled, connected, chained, etc.
     // TODO: piece safety
     // TODO: passed pawns

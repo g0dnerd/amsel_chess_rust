@@ -10,24 +10,80 @@ fn main() {
 
     // Main CLI Loop
     let mut pos = Position::new();
-    println!("Running at depth {}", engine::negamax::MAX_DEPTH);
+    let mut max_depth = 4;
     
     if args.len() > 1 {
         match args[1].as_str() {
             "help" => {
-                println!("Usage: [eve] [benchmark]");
+                println!("Usage: [depth <n>] [eve] [benchmark]");
                 println!("Provide no arguments to play against the engine.");
                 println!("Arguments:");
                 println!("eve - Engine vs Engine. The engine will play against itself until a result has been reached.");
-                println!("benchmark - Run the engine in benchmark mode, where it will play against itself for 3 moves.");
+                println!("benchmark - Run the engine in benchmark mode, where it will play against itself for 6 moves.");
+                println!("depth <n> - Set the depth of the search algorithm. Default is 4, maximum is 8.");
                 return;
             },
-            "benchmark" => {
-                for _ in 0..1 {
-                    pos.print_position();
-                    game::make_engine_move(&mut pos);
+            "depth" => {
+                if args.len() < 3 {
+                    println!("Error: No depth provided.");
+                    return;
                 }
+                let depth = args[2].parse::<u8>();
+                match depth {
+                    Ok(d) => {
+                        if d > 8 {
+                            println!("Error: Depth cannot be greater than 8.");
+                            return;
+                        }
+                        println!("Setting depth to {}.", d);
+                        max_depth = d;
+                    },
+                    Err(_) => {
+                        println!("Error: Invalid depth provided.");
+                        return;
+                    }
+                }
+            },
+            _ => {
+                println!("Invalid argument. Type 'help' for usage information.");
                 return;
+            },
+        }
+    }
+    if args.len() > 3 {
+        match args[3].as_str() {
+            "benchmark" => {
+                for _ in 0..6 {
+                    pos.print_position();
+                    let eval = evaluation::main_evaluation(&mut pos);
+                    if eval == i32::MIN + 1 || eval == i32::MAX - 1 {
+                        println!("Current evaluation: - (game over)");
+                    } else {
+                        match pos.state.active_player {
+                            types::Color::White => {
+                                println!("Current evaluation: {}", eval);
+                            },
+                            types::Color::Black => {
+                                println!("Current evaluation: {}", -eval);
+                            }
+                        }
+                    }
+                    if game::is_in_checkmate(&mut pos) {
+                        match pos.state.active_player {
+                            types::Color::White => {
+                                println!("Black wins by checkmate!");
+                                pos.state.game_result = types::state::GameResult(types::Results::BLACK_VICTORY);
+                                return;
+                            },
+                            types::Color::Black => {
+                                println!("White wins by checkmate!");
+                                pos.state.game_result = types::state::GameResult(types::Results::WHITE_VICTORY);
+                                return;
+                            }
+                        }
+                    }
+                    game::make_engine_move(&mut pos, max_depth);
+                }
             },
             "eve" => {
                 println!("Running in 0 player mode.");
@@ -60,7 +116,7 @@ fn main() {
                             }
                         }
                     }
-                    game::make_engine_move(&mut pos);   
+                    game::make_engine_move(&mut pos, max_depth);   
                 }
             },
             _ => {
@@ -118,7 +174,7 @@ fn main() {
                             continue;
                     }
                     else if o == [97, 97] {
-                        game::make_engine_move(&mut pos);
+                        game::make_engine_move(&mut pos, max_depth);
                         continue;
                     }
                 }

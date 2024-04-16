@@ -7,8 +7,6 @@ use crate::evaluation;
 use types::square::Square;
 use types::position::Position;
 
-pub const MAX_DEPTH: u8 = 4;
-
 // Returns all legal moves for the current position ordered by rough likelihood of being played
 fn order_moves(mut moves: Vec<(Square, Square)>, pos: &mut Position) -> Vec<(Square, Square)> {
     moves.shuffle(&mut rand::thread_rng());
@@ -58,8 +56,8 @@ fn negamax(pos: &mut Position, depth: u8, alpha: i32, beta: i32) -> i32 {
 
 }
 
-pub fn find_best_move(pos: &mut Position) -> (Square, Square) {
-    println!("Running search at depth {}", MAX_DEPTH);
+pub fn find_best_move(pos: &mut Position, depth: u8) -> (Square, Square) {
+    println!("Running search at depth {}", depth);
     
     let mut legal_moves = movegen::get_all_legal_moves_for_color(pos.state.active_player, pos);
     legal_moves = order_moves(legal_moves, pos);
@@ -93,7 +91,7 @@ pub fn find_best_move(pos: &mut Position) -> (Square, Square) {
 
         let mut new_pos = pos.clone();
         game::make_specific_engine_move(&mut new_pos, *from, *to);
-        let score = -negamax(&mut new_pos, MAX_DEPTH, alpha, beta);
+        let score = -negamax(&mut new_pos, depth, alpha, beta);
 
         // Locally keep track of the highest scoring move
         if score > best_score {
