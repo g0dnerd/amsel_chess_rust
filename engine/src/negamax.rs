@@ -42,24 +42,18 @@ fn negamax(pos: &mut Position, depth: u8, alpha: i32, beta: i32) -> i32 {
         let mut new_pos = pos.clone();
         game::make_specific_engine_move(&mut new_pos, *from, *to);
 
-        // println!("Looking at line {:?}", new_pos.move_history);
-
-        /* The local best score either remains the same or, if a higher score is found,
-        gets updated to that score. Our local cutoff value becomes the global cutoff for the child node. */
         let score =
             -negamax(&mut new_pos, depth - 1, -beta, -alpha);
-        // The local cutoff value is updated if a new best score is found
+
+        // Beta-cutoff
         if score >= beta {
             return beta;
         }
+
+        // Update the local best score
         alpha = cmp::max(alpha, score);
-        // If the local cutoff value is greater than the global cutoff value, we prune the branch
-        /* if alpha > beta {
-            // println!("Pruning line {:?}", new_pos.move_history);
-            break;
-        } */
     }
-    // Return the best score found
+    // Return the best score found (or the cutoff if no improvement was made)
     alpha
 
 }
@@ -82,10 +76,11 @@ pub fn find_best_move(pos: &mut Position) -> (Square, Square) {
 
     let mut from_prev = Square::A1;
     let mut to_prev = Square::A1;
-
     let mut score_prev = i32::MIN + 1;
 
     for (from, to) in legal_moves.iter() {
+
+        // Update the progress bar
         if from_prev == Square::A1 {
             bar.set_message(format!(
                 "Now evaluating move {:?} -> {:?}\n",
@@ -95,17 +90,19 @@ pub fn find_best_move(pos: &mut Position) -> (Square, Square) {
                 "Current best move: {:?} -> {:?} (Score {})\nLast move {:?} -> {:?} had score {}\nNow evaluating move {:?} -> {:?}\n",
                 best_move.0, best_move.1, best_score, from_prev, to_prev, score_prev, from, to));
         }
+
         let mut new_pos = pos.clone();
         game::make_specific_engine_move(&mut new_pos, *from, *to);
         let score = -negamax(&mut new_pos, MAX_DEPTH, alpha, beta);
+
+        // Locally keep track of the highest scoring move
         if score > best_score {
             best_score = score;
             best_move = (*from, *to);
         }
+
+        // Update the global cutoff
         alpha = cmp::max(alpha, best_score);
-        bar.set_message(format!(
-            "Current best move: {:?} -> {:?} (Score {})\nEvaluated move {:?} -> {:?} with score {}\n",
-            best_move.0, best_move.1, best_score, from, to, score));
         
         bar.inc(1);
         from_prev = *from;
