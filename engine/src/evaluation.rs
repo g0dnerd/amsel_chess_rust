@@ -89,8 +89,8 @@ pub fn main_evaluation(pos: &mut Position) -> i32 {
         }
     }
     let player_to_move = match pos.state.active_player {
-        types::Color::White => -1,
-        types::Color::Black => 1
+        types::Color::White => 1,
+        types::Color::Black => -1
     };
 
     let midgame_evaluation = get_midgame_evaluation(pos);
