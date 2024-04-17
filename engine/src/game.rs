@@ -36,7 +36,7 @@ pub fn update_attackers(pos: &mut Position, attackers: BitBoard) {
                     }
                 },
                 1 => {
-                    let attacks = movegen::get_knight_moves(attacker_square, pos);
+                    let attacks = movegen::get_pseudolegal_knight_moves(attacker_square);
                     pos.attack_bitboards[attacker_square as usize] = attacks;
                     match color {
                         Color::White => pos.update_attack_maps(attacker_square, attacks),

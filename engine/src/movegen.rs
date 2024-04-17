@@ -127,7 +127,7 @@ pub fn get_rook_moves(square: Square, position: &Position) -> BitBoard {
 
     // Remove all moves that would capture a piece of the same color
     let color = position.piece_at(square).unwrap().1;
-    moves = moves & !position.color_bitboards[color as usize];
+    moves &= !position.color_bitboards[color as usize];
     moves
 }
 
@@ -152,7 +152,7 @@ pub fn get_bishop_moves(square: Square, position: &Position) -> BitBoard {
 
     // Remove all moves that would capture a piece of the same color
     let color = position.piece_at(square).unwrap().1;
-    moves = moves & !position.color_bitboards[color as usize];
+    moves &= !position.color_bitboards[color as usize];
     moves
 }
 
@@ -175,7 +175,7 @@ pub fn get_queen_moves_from_blockers(square: Square, blockers: BitBoard) -> BitB
 pub fn get_knight_moves(square: Square, position: &Position) -> BitBoard {
     let mut moves = get_pseudolegal_knight_moves(square);
     let color = position.piece_at(square).unwrap().1;
-    moves = moves & !position.color_bitboards[color as usize];
+    moves &= !position.color_bitboards[color as usize];
     moves
 }
 

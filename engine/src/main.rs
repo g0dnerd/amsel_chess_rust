@@ -53,7 +53,7 @@ fn main() {
     if args.len() > 3 {
         match args[3].as_str() {
             "benchmark" => {
-                for _ in 0..6 {
+                for _ in 0..1 {
                     pos.print_position();
                     let eval = evaluation::main_evaluation(&mut pos);
                     if eval == i32::MIN + 1 || eval == i32::MAX - 1 {
@@ -198,6 +198,8 @@ fn main() {
         }
     }
     
+    println!("Move history: {:?}", pos.move_history);
+
     // Wait for the user to press enter before closing the program
     let mut input = String::new();
     println!("Press enter to close the game.");
