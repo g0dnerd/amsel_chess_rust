@@ -1,15 +1,37 @@
 use std::{cmp,
     thread,
+    time::Instant,
+    collections::HashMap,
     sync::{Arc, Mutex}
 };
 use rand::seq::SliceRandom;
+use lazy_static::lazy_static;
 use crate::movegen;
 use crate::game;
 use crate::evaluation;
 use types::square::Square;
 use types::position::Position;
+use precompute::rng;
 
 const NUM_THREADS: u8 = 4;
+const NUM_PIECE_TYPES: usize = 12;
+const NUM_SQUARES: usize = 64;
+
+// Define the Zobrist keys as a global variable
+lazy_static! {
+    static ref ZOBRIST_KEYS: [[u64; NUM_SQUARES]; NUM_PIECE_TYPES] = initialize_zobrist_keys();
+}
+
+// Define the transposition table as a global variable
+lazy_static! {
+    static ref TRANSPOSITION_TABLE: Mutex<HashMap<u64, TranspositionEntry>> = Mutex::new(HashMap::new());
+}
+
+#[derive(Debug, Copy, Clone)]
+struct TranspositionEntry {
+    depth: u8,
+    score: i32,
+}
 
 struct SearchResult {
     score: i32,
@@ -20,6 +42,86 @@ struct SearchParameters{
     alpha: i32,
     beta: i32,
     depth: u8,
+}
+
+// Helper functino to generate a random 64-bit Zobrist key
+/* fn generate_random_key() -> u64 {
+    let key = 
+    println!("Generated key: {}", key);
+    key
+} */
+
+// Function to initialize the Zobrist keys
+fn initialize_zobrist_keys() -> [[u64; NUM_SQUARES]; NUM_PIECE_TYPES] {
+    let mut rng_instance = rng::Rng::default();
+    let mut keys = [[0; NUM_SQUARES]; NUM_PIECE_TYPES];
+    let mut dupe_keys = Vec::new();
+    for piece_type in 0..NUM_PIECE_TYPES {
+        for square in 0..NUM_SQUARES {
+            let key = rng_instance.next_u64();
+            // println!("Generated key: {} for piece type {} and square {}", key, piece_type, square);
+            if dupe_keys.contains(&key) {
+                panic!("Duplicate key generated: {}", key);
+            }
+            dupe_keys.push(key);
+            keys[piece_type][square] = key;
+        }
+    }
+    println!("Successfully initialized Zobrist keys.");
+    keys
+}
+
+fn calculate_hash(pos: &Position) -> u64 {
+    let mut hash = 0;
+    for square in 0..NUM_SQUARES {
+        if let Some((piece, _color)) = pos.piece_at(Square::index(square)) {
+            hash ^= ZOBRIST_KEYS[piece as usize][square];
+        }
+    }
+    // println!("Calculated hash: {}", hash);
+    hash
+}
+
+// Function to get a position's entry from the transposition table
+fn get_entry(hash: u64) -> Option<TranspositionEntry> {
+    // println!("Attempting to get entry for hash {} from transposition table.", hash);
+    match TRANSPOSITION_TABLE.lock() {
+        Ok(table) => {
+            // println!("Acquired lock on transposition table at line {}, getting entry.", line!());
+            let entry = table.get(&hash).cloned();
+            // println!("Released lock on transposition table at line {}.", line!());
+            entry
+        },
+        Err(e) => {
+            println!("Error acquiring lock on transposition table while getting entry: {:?}", e);
+            None
+        }
+    }
+}
+
+// Function to store a position's entry in the transposition table
+fn store_entry(hash: u64, entry: TranspositionEntry) {
+    // println!("Attempting to store entry for hash {} in transposition table.", hash);
+    match TRANSPOSITION_TABLE.lock() {
+        Ok(mut table) => {
+            // println!("Acquired lock on transposition table, storing entry.");
+            // Check for hash collision
+            if let Some(old_entry) = table.get(&hash) {
+                if entry.depth > old_entry.depth {
+                    // println!("During hash collision, replacing entry because new entry has depth {} and old entry has depth {}.", entry.depth, old_entry.depth);
+                    table.insert(hash, entry);
+                } else {
+                    return;
+                }
+            } else {
+                table.insert(hash, entry);
+            }
+            // println!("Released lock on transposition table.");
+        },
+        Err(_) => {
+            println!("Error acquiring lock on transposition table while storing entry.");
+        }
+    }
 }
 
 // Returns all legal moves for the current position ordered by rough likelihood of being played
@@ -37,6 +139,24 @@ fn order_moves(mut moves: Vec<(Square, Square)>, pos: &mut Position) -> Vec<(Squ
 }
 
 fn negamax(pos: &mut Position, params: &mut SearchParameters) -> i32 {
+    
+    // println!("Negamax called for line {:?}", pos.move_history);
+
+    // If the position has already been evaluated to the desired depth, return the stored score
+    let hash = calculate_hash(pos);
+    // println!("Negamax received following hash for current position: {}", hash);
+
+    if let Some(entry) = get_entry(hash) {
+        if entry.depth >= params.depth {
+            // println!("Found stored entry with depth {} and score {}, terminating child node.", entry.depth, entry.score);
+            return entry.score;
+        } else {
+            // println!("Found stored entry with depth {} but need depth {}", entry.depth, params.depth);
+        }
+    } else {
+        // println!("No stored entry found.");
+    }
+
     if params.depth == 0 || !pos.state.game_result.is_ongoing() {
         return evaluation::main_evaluation(pos);
     }
@@ -52,6 +172,7 @@ fn negamax(pos: &mut Position, params: &mut SearchParameters) -> i32 {
 
     // Iterate over all legal moves
     for (from, to) in legal_moves.iter() {
+        // println!("Evaluating move {:?} -> {:?}", from, to);
         let mut new_pos = pos.clone();
         game::make_specific_engine_move(&mut new_pos, *from, *to);
 
@@ -61,6 +182,10 @@ fn negamax(pos: &mut Position, params: &mut SearchParameters) -> i32 {
             depth: params.depth - 1,
         });
         
+        store_entry(hash, TranspositionEntry {
+            depth: params.depth,
+            score,
+        });
 
         // Beta-cutoff
         if score >= params.beta {
@@ -76,6 +201,7 @@ fn negamax(pos: &mut Position, params: &mut SearchParameters) -> i32 {
 }
 
 pub fn find_best_move(pos: &mut Position, depth: u8) -> (Square, Square) {
+    let start_time = Instant::now();
     println!("Running search at depth {}", depth);
     
     let mut legal_moves = movegen::get_all_legal_moves_for_color(pos.state.active_player, pos);
@@ -157,6 +283,9 @@ pub fn find_best_move(pos: &mut Position, depth: u8) -> (Square, Square) {
             }
         }
     }
+
+    let duration = start_time.elapsed();
+    println!("Search took {} seconds", duration.as_secs_f32());
 
     best_result.best_move
 }
