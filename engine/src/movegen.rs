@@ -91,6 +91,18 @@ pub fn get_pseudolegal_knight_moves(square: Square) -> BitBoard {
     moves
 }
 
+pub fn get_pseudolegal_slider_moves(square: Square, directions: &[(i8, i8)]) -> BitBoard {
+    let mut moves = BitBoard::empty();
+    for &(dx, dy) in directions {
+        let mut ray = square;
+        while let Some(offset_by_delta) = ray.try_offset(dx, dy) {
+            ray = offset_by_delta;
+            moves |= BitBoard::from_square(ray);
+        }
+    }
+    moves
+}
+
 pub fn pawn_attacks(position: &mut Position, square: Square) -> BitBoard {
     let mut moves = BitBoard::empty();
     let color = position.piece_at(square).unwrap().1;

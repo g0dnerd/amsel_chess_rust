@@ -11,6 +11,7 @@ precompute = { path = "../precompute" }
 rand = "0.8.5"
 indicatif = "0.17.8"
 lazy_static = "1.4.0"
+rayon = "1.10.0"
 
 [[bin]]
 name = "engine"

@@ -239,7 +239,6 @@ fn get_midgame_evaluation(pos: &mut Position) -> i32 {
     evaluation_score += get_piece_square_table_value_midgame(pos) - get_piece_square_table_value_midgame(&pos_flipped);
     let white_mobility = get_mobility_score(pos, true) as i32;
     let black_mobility = get_mobility_score(&pos_flipped, true) as i32;
-    // println!("White mobility: {}, Black mobility: {}", white_mobility, black_mobility);
     evaluation_score += white_mobility - black_mobility;
     // evaluation_score += get_mobility_score(pos, true) as i32 - get_mobility_score(&pos_flipped, true) as i32;
     // TODO: pawn structure: isolated, backward, doubled, connected, chained, etc.
@@ -329,7 +328,9 @@ fn get_mobility(pos: &Position, square: &Square, mobility_range: BitBoard) -> u3
     if let Some((piece, _color)) = pos.piece_at(*square) {
         match piece {
             0 => {
-                let mut moves = movegen::get_first_actual_blockers(&[(0, 1), (0, -1), (1, 0), (-1, 0)], Square::index(*square as usize), pos);
+                let directions = &[(0, 1), (0, -1), (1, 0), (-1, 0)];
+                let blockers = movegen::get_first_actual_blockers(directions, *square, pos);
+                let mut moves = movegen::slider_moves(Square::index(*square as usize), blockers, directions);
                 // Remove all squares that are not within our mobility range
                 moves &= mobility_range;
                 return moves.count_ones();
@@ -341,13 +342,17 @@ fn get_mobility(pos: &Position, square: &Square, mobility_range: BitBoard) -> u3
                 return moves.count_ones();
             },
             2 => {
-                let mut moves = movegen::get_first_actual_blockers(&[(1, 1), (1, -1), (-1, 1), (-1, -1)], Square::index(*square as usize), pos);
+                let directions = &[(1, 1), (1, -1), (-1, 1), (-1, -1)];
+                let blockers = movegen::get_first_actual_blockers(directions, *square, pos);
+                let mut moves = movegen::slider_moves(Square::index(*square as usize), blockers, directions);
                 moves &= mobility_range;
                 return moves.count_ones();
             },
             3 => {
-                let mut moves = movegen::get_first_actual_blockers(&[(0, 1), (0, -1), (1, 0), (-1, 0), (1, 1), (1, -1), (-1, 1), (-1, -1)], Square::index(*square as usize), pos);
-                // Remove all squares that are occupied by our own queens
+                let directions = &[(0, 1), (0, -1), (1, 0), (-1, 0), (1, 1), (1, -1), (-1, 1), (-1, -1)];
+                let blockers = movegen::get_first_actual_blockers(directions, *square, pos);
+                let mut moves = movegen::slider_moves(Square::index(*square as usize), blockers, directions);
+                // Remove all squares that are not within our mobility range
                 moves &= mobility_range;
                 return moves.count_ones();
             },
@@ -378,7 +383,7 @@ fn is_in_mobility_area(pos: &Position, square: &Square) -> bool {
     }
     // If the square is on the 2nd or 3rd rank and is occupied by our own pawn, return false
     if pos.color_bitboards[0] & pos.piece_bitboards[5] & BitBoard::from_square(*square) != BitBoard::empty() &&
-        *square as usize / 8 < 4 {
+        *square as usize / 8 < 3 {
             return false;
     }
     // TODO: exclude blockers for king from the mobility area

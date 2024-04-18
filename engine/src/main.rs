@@ -7,6 +7,7 @@ fn main() {
     let args: Vec<String> = env::args().collect();
     // dbg!(&args);
     env::set_var("RUST_BACKTRACE", "1");
+    env::set_var("RAYON_NUM_THREADS", "8");
 
     // Main CLI Loop
     let mut pos = Position::new();
@@ -82,7 +83,7 @@ fn main() {
                             }
                         }
                     }
-                    game::make_engine_move(&mut pos, max_depth);
+                    game::make_engine_move(&mut pos, Some(max_depth));
                 }
             },
             "eve" => {
@@ -116,7 +117,7 @@ fn main() {
                             }
                         }
                     }
-                    game::make_engine_move(&mut pos, max_depth);   
+                    game::make_engine_move(&mut pos, Some(max_depth));   
                 }
             },
             _ => {
@@ -174,7 +175,7 @@ fn main() {
                             continue;
                     }
                     else if o == [97, 97] {
-                        game::make_engine_move(&mut pos, max_depth);
+                        game::make_engine_move(&mut pos, None);
                         continue;
                     }
                 }

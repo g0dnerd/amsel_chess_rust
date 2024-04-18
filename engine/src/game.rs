@@ -196,7 +196,7 @@ pub fn make_player_move(pos: &mut Position, from: Square, to: Square) -> Result<
     Ok(())
 }
 
-pub fn make_engine_move(pos: &mut Position, depth: u8) {  
+pub fn make_engine_move(pos: &mut Position, depth: Option<u8>) {  
     let best_move = negamax::find_best_move(pos, depth);
     let (from, target_square) = best_move;
 

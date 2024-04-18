@@ -1,11 +1,10 @@
+use std::sync::atomic::AtomicBool;
 use std::{cmp,
-    thread,
     time::Instant,
     collections::HashMap,
-    sync::{Arc, Mutex,
-        atomic::{AtomicBool, Ordering}
-    },
+    sync::Mutex,
 };
+use rayon::prelude::*;
 use rand::seq::SliceRandom;
 use lazy_static::lazy_static;
 use indicatif::{ProgressBar, ProgressStyle};
@@ -16,9 +15,10 @@ use types::square::Square;
 use types::position::Position;
 use precompute::rng;
 
-const NUM_THREADS: u8 = 4;
 const NUM_PIECE_TYPES: usize = 12;
 const NUM_SQUARES: usize = 64;
+
+static MAX_DEPTH: u8 = 6;
 
 // Define the Zobrist keys as a global variable
 lazy_static! {
@@ -28,6 +28,10 @@ lazy_static! {
 // Define the transposition table as a global variable
 lazy_static! {
     static ref TRANSPOSITION_TABLE: Mutex<HashMap<u64, TranspositionEntry>> = Mutex::new(HashMap::new());
+}
+
+lazy_static! {
+    static ref MATE_IN_ONE_FOUND: AtomicBool = AtomicBool::new(false);
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -64,7 +68,7 @@ fn initialize_zobrist_keys() -> [[u64; NUM_SQUARES]; NUM_PIECE_TYPES] {
             keys[piece_type][square] = key;
         }
     }
-    println!("Successfully initialized Zobrist keys.");
+    // println!("Successfully initialized Zobrist keys.");
     keys
 }
 
@@ -141,17 +145,15 @@ fn negamax(pos: &mut Position, params: &mut SearchParameters) -> i32 {
 
     // If the position has already been evaluated to the desired depth, return the stored score
     let hash = calculate_hash(pos);
-    // println!("Negamax received following hash for current position: {}", hash);
 
     if let Some(entry) = get_entry(hash) {
         if entry.depth >= params.depth {
-            // println!("Found stored entry with depth {} and score {}, terminating child node.", entry.depth, entry.score);
             return entry.score;
-        } else {
-            // println!("Found stored entry with depth {} but need depth {}", entry.depth, params.depth);
         }
-    } else {
-        // println!("No stored entry found.");
+    } 
+
+    if MATE_IN_ONE_FOUND.load(std::sync::atomic::Ordering::Relaxed) {
+        return i32::MIN;
     }
 
     if params.depth == 0 || !pos.state.game_result.is_ongoing() {
@@ -163,8 +165,7 @@ fn negamax(pos: &mut Position, params: &mut SearchParameters) -> i32 {
         movegen::get_all_legal_moves_for_color(pos.state.active_player, pos);
     legal_moves = order_moves(legal_moves, pos);
 
-    // Initialize the maximum score to negative infinity
-    // let mut local_best_score = i32::MIN + 1;
+    let mut score = i32::MIN + 1;
     let mut alpha = params.alpha;
 
     // Iterate over all legal moves
@@ -173,33 +174,38 @@ fn negamax(pos: &mut Position, params: &mut SearchParameters) -> i32 {
         let mut new_pos = pos.clone();
         game::make_specific_engine_move(&mut new_pos, *from, *to);
 
-        let score = -negamax(&mut new_pos, &mut SearchParameters {
+        score = cmp::max(score, -negamax(&mut new_pos, &mut SearchParameters {
             alpha: -params.beta,
             beta: -alpha,
             depth: params.depth - 1,
-        });
+        }));
         
         store_entry(hash, TranspositionEntry {
             depth: params.depth,
             score,
         });
 
+        alpha = cmp::max(alpha, score);
+
         // Beta-cutoff
-        if score >= params.beta {
-            return params.beta;
+        if alpha >= params.beta {
+            break;
         }
 
-        // Update the local best score
-        alpha = cmp::max(alpha, score);
     }
     // Return the best score found (or the cutoff if no improvement was made)
-    alpha
+    score
 
 }
 
-pub fn find_best_move(pos: &mut Position, depth: u8) -> (Square, Square) {
+pub fn find_best_move(pos: &mut Position, depth: Option<u8>) -> (Square, Square) {
     let start_time = Instant::now();
-    println!("Running search at depth {} with {} threads", depth, NUM_THREADS);
+
+    MATE_IN_ONE_FOUND.store(false, std::sync::atomic::Ordering::Relaxed);
+
+    let depth = depth.unwrap_or(MAX_DEPTH);
+
+    println!("Running search at depth {} with {} threads", depth, rayon::current_num_threads());
     
     let mut legal_moves = movegen::get_all_legal_moves_for_color(pos.state.active_player, pos);
     if legal_moves.len() == 1 {
@@ -212,108 +218,43 @@ pub fn find_best_move(pos: &mut Position, depth: u8) -> (Square, Square) {
     bar.set_style(ProgressStyle::with_template("Move {pos}/{len} [{bar:40.cyan/blue}] {elapsed_precise}").
         unwrap().
         progress_chars("#>-"));
-
+    bar.inc(0);
     legal_moves = order_moves(legal_moves, pos);
 
     let alpha = i32::MIN + 1;
     let beta = i32::MAX - 1;
 
-    // Divide legal moves into NUM_THREADS amount of chunks
-    let chunk_size = cmp::max(legal_moves.len() / NUM_THREADS as usize, 1);
-    let chunks: Vec<Vec<(Square, Square)>> = legal_moves.chunks(chunk_size).map(|chunk|chunk.to_vec()).collect();
-
-    let mut threads = vec![];
-
-    // Create shared parameters for the threads
-    let mate_in_one_found = Arc::new(AtomicBool::new(false));
-    let shared_pos = Arc::new(Mutex::new(pos.clone()));
-    let shared_alpha = Arc::new(Mutex::new(alpha));
-    let shared_beta = Arc::new(Mutex::new(beta));
-    let shared_bar = Arc::new(Mutex::new(bar));
-
-    for chunk in chunks {
-        // Create local references to the shared parameters
-        let shared_pos = Arc::clone(&shared_pos);
-        let shared_alpha = Arc::clone(&shared_alpha);
-        let shared_beta = Arc::clone(&shared_beta);
-        let shared_mate_in_one_found = Arc::clone(&mate_in_one_found);
-        let shared_bar = Arc::clone(&shared_bar);
-
-        // Spawn threads
-        let thread = thread::spawn(move || {
-            let mut local_best_move = (Square::A1, Square::A1);
-            let mut local_best_score = i32::MIN + 1;
-            let mut local_alpha = shared_alpha.lock().unwrap();
-            let local_beta = shared_beta.lock().unwrap();
-
-            for (from, to) in &chunk {
-                // If another thread has found a mate in one, return immediately
-                if shared_mate_in_one_found.load(Ordering::Relaxed) {
-                    return SearchResult {
-                        score: i32::MIN,
-                        best_move: (Square::A1, Square::A1),
-                    };
-                }
-                let mut new_pos = shared_pos.lock().unwrap().clone();
-
-                game::make_specific_engine_move(&mut new_pos, *from, *to);
-
-                let score = -negamax(&mut new_pos, &mut SearchParameters {
-                    alpha: *local_alpha,
-                    beta: *local_beta,
-                    depth,
-                });
-
-                // If the move is checkmate in 1, tell the other threads to stop and return the move
-                if score == i32::MAX {
-                    shared_mate_in_one_found.store(true, Ordering::Relaxed);
-                    return SearchResult {
-                        score: i32::MAX,
-                        best_move: (*from, *to),
-                    };
-                }
-
-                let bar = shared_bar.lock().unwrap();
-                bar.inc(1);
-                drop(bar);
-
-                if score > local_best_score {
-                    local_best_score = score;
-                    local_best_move = (*from, *to);
-                }
-
-                *local_alpha = cmp::max(*local_alpha, local_best_score);
+    let results: Vec<SearchResult> = legal_moves.par_iter().
+        map(|&(from, to)| {
+            let mut new_pos = pos.clone();
+            game::make_specific_engine_move(&mut new_pos, from, to);
+            if game::is_in_checkmate(&mut new_pos) {
+                MATE_IN_ONE_FOUND.store(true, std::sync::atomic::Ordering::Relaxed);
+                return SearchResult {
+                    score: i32::MAX,
+                    best_move: (from, to),
+                };
             }
+            let score = -negamax(&mut new_pos, &mut SearchParameters {
+                alpha,
+                beta,
+                depth,
+            });
+
+            bar.inc(1);
             SearchResult {
-                score: local_best_score,
-                best_move: local_best_move,
+                score,
+                best_move: (from, to),
             }
-        });
-
-        threads.push(thread);
-    }
-
-    // Collect results from threads
-    let mut best_result = SearchResult {
-        score: i32::MIN + 1,
+        }).collect();
+    let best_result = results.into_iter().max_by_key(|r| r.score).unwrap_or(SearchResult {
+        score: i32::MIN,
         best_move: (Square::A1, Square::A1),
-    };
-
-    for thread in threads {
-        match thread.join() {
-            Ok(result) => {
-                if result.score > best_result.score {
-                    best_result = result;
-                }
-            },
-            Err(_) => {
-                println!("Error joining thread");
-            }
-        }
-    }
-
+    });
+    
+    bar.finish();
     let duration = start_time.elapsed();
-    println!("Search took {} seconds", duration.as_secs_f32());
+    println!("Search completed in {} seconds", duration.as_secs_f32());
 
     best_result.best_move
 }
