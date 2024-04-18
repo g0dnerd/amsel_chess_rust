@@ -2,10 +2,13 @@ use std::{cmp,
     thread,
     time::Instant,
     collections::HashMap,
-    sync::{Arc, Mutex}
+    sync::{Arc, Mutex,
+        atomic::{AtomicBool, Ordering}
+    },
 };
 use rand::seq::SliceRandom;
 use lazy_static::lazy_static;
+use indicatif::{ProgressBar, ProgressStyle};
 use crate::movegen;
 use crate::game;
 use crate::evaluation;
@@ -44,12 +47,6 @@ struct SearchParameters{
     depth: u8,
 }
 
-// Helper functino to generate a random 64-bit Zobrist key
-/* fn generate_random_key() -> u64 {
-    let key = 
-    println!("Generated key: {}", key);
-    key
-} */
 
 // Function to initialize the Zobrist keys
 fn initialize_zobrist_keys() -> [[u64; NUM_SQUARES]; NUM_PIECE_TYPES] {
@@ -202,12 +199,19 @@ fn negamax(pos: &mut Position, params: &mut SearchParameters) -> i32 {
 
 pub fn find_best_move(pos: &mut Position, depth: u8) -> (Square, Square) {
     let start_time = Instant::now();
-    println!("Running search at depth {}", depth);
+    println!("Running search at depth {} with {} threads", depth, NUM_THREADS);
     
     let mut legal_moves = movegen::get_all_legal_moves_for_color(pos.state.active_player, pos);
     if legal_moves.len() == 1 {
         return legal_moves[0];
     }
+
+    println!("Evaluating {} legal moves", legal_moves.len());
+
+    let bar = ProgressBar::new(legal_moves.len() as u64);
+    bar.set_style(ProgressStyle::with_template("Move {pos}/{len} [{bar:40.cyan/blue}] {elapsed_precise}").
+        unwrap().
+        progress_chars("#>-"));
 
     legal_moves = order_moves(legal_moves, pos);
 
@@ -221,15 +225,19 @@ pub fn find_best_move(pos: &mut Position, depth: u8) -> (Square, Square) {
     let mut threads = vec![];
 
     // Create shared parameters for the threads
+    let mate_in_one_found = Arc::new(AtomicBool::new(false));
     let shared_pos = Arc::new(Mutex::new(pos.clone()));
     let shared_alpha = Arc::new(Mutex::new(alpha));
     let shared_beta = Arc::new(Mutex::new(beta));
+    let shared_bar = Arc::new(Mutex::new(bar));
 
     for chunk in chunks {
         // Create local references to the shared parameters
         let shared_pos = Arc::clone(&shared_pos);
         let shared_alpha = Arc::clone(&shared_alpha);
         let shared_beta = Arc::clone(&shared_beta);
+        let shared_mate_in_one_found = Arc::clone(&mate_in_one_found);
+        let shared_bar = Arc::clone(&shared_bar);
 
         // Spawn threads
         let thread = thread::spawn(move || {
@@ -239,6 +247,13 @@ pub fn find_best_move(pos: &mut Position, depth: u8) -> (Square, Square) {
             let local_beta = shared_beta.lock().unwrap();
 
             for (from, to) in &chunk {
+                // If another thread has found a mate in one, return immediately
+                if shared_mate_in_one_found.load(Ordering::Relaxed) {
+                    return SearchResult {
+                        score: i32::MIN,
+                        best_move: (Square::A1, Square::A1),
+                    };
+                }
                 let mut new_pos = shared_pos.lock().unwrap().clone();
 
                 game::make_specific_engine_move(&mut new_pos, *from, *to);
@@ -248,6 +263,19 @@ pub fn find_best_move(pos: &mut Position, depth: u8) -> (Square, Square) {
                     beta: *local_beta,
                     depth,
                 });
+
+                // If the move is checkmate in 1, tell the other threads to stop and return the move
+                if score == i32::MAX {
+                    shared_mate_in_one_found.store(true, Ordering::Relaxed);
+                    return SearchResult {
+                        score: i32::MAX,
+                        best_move: (*from, *to),
+                    };
+                }
+
+                let bar = shared_bar.lock().unwrap();
+                bar.inc(1);
+                drop(bar);
 
                 if score > local_best_score {
                     local_best_score = score;
