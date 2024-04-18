@@ -13,8 +13,10 @@ Compute and save magic bitboards by running `cargo build --bin precompute`
 
 ## ToDos
 * remove the second binary crate and move the precomputation work to `cargo build` for the main binary
-* add castling to king's move generation
 * add en passant
+* re-introduce multithreading
+* transposition tables
+* refactor square class to a simple index
 
 ### Done
 * dynamic storage of slider paths & attacks to further increase performance

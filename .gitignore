@@ -2,6 +2,7 @@
 .vscode
 *.svg
 *.out
+*.old
 *.data
 callgrind.*
 cachegrind.*
