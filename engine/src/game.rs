@@ -78,8 +78,8 @@ pub fn update_attackers(pos: &mut Position, attackers: BitBoard) {
                 _ => (),
             }
         } else {
-            panic!("Trying to update attackers on empty square, move history is {:?} and attackers are {:?}",
-                pos.move_history, attackers);
+            panic!("Trying to update attackers on empty square {:?}, move history is {:?} and attackers are {:?}",
+                attacker_square, pos.move_history, attackers);
         }
         attacker_board.clear_lsb();
     }
@@ -147,20 +147,20 @@ pub fn make_player_move(pos: &mut Position, from: Square, to: Square) -> Result<
     if is_king {
         if from == Square::E1 && to == Square::G1 {
             pos.make_castling_move(&Square::H1, &Square::F1);
-            pos.state.switch_active_player();
             attackers_to_update |= BitBoard::from_square(Square::F1);
+            attackers_to_update ^= BitBoard::from_square(Square::H1);
         } else if from == Square::E1 && to == Square::C1 {
             pos.make_castling_move(&Square::A1, &Square::D1);
-            pos.state.switch_active_player();
             attackers_to_update |= BitBoard::from_square(Square::D1);
+            attackers_to_update ^= BitBoard::from_square(Square::A1);
         } else if from == Square::E8 && to == Square::G8 {
             pos.make_castling_move(&Square::H8, &Square::F8);
-            pos.state.switch_active_player();
             attackers_to_update |= BitBoard::from_square(Square::F8);
+            attackers_to_update ^= BitBoard::from_square(Square::H8);
         } else if from == Square::E8 && to == Square::C8 {
             pos.make_castling_move(&Square::A8, &Square::D8);
-            pos.state.switch_active_player();
             attackers_to_update |= BitBoard::from_square(Square::D8);
+            attackers_to_update ^= BitBoard::from_square(Square::A8);
         }
     }
 
@@ -323,19 +323,19 @@ pub fn make_specific_engine_move(pos: &mut Position, from: Square, to: Square) {
     // If the move is a castling move, move the rook as well
     if is_king {
         if from == Square::E1 && to == Square::G1 {
-            pos.make_move(&Square::H1, &Square::F1);
+            pos.make_castling_move(&Square::H1, &Square::F1);
             attackers_to_update |= BitBoard::from_square(Square::F1);
             attackers_to_update ^= BitBoard::from_square(Square::H1);
         } else if from == Square::E1 && to == Square::C1 {
-            pos.make_move(&Square::A1, &Square::D1);
+            pos.make_castling_move(&Square::A1, &Square::D1);
             attackers_to_update |= BitBoard::from_square(Square::D1);
             attackers_to_update ^= BitBoard::from_square(Square::A1);
         } else if from == Square::E8 && to == Square::G8 {
-            pos.make_move(&Square::H8, &Square::F8);
+            pos.make_castling_move(&Square::H8, &Square::F8);
             attackers_to_update |= BitBoard::from_square(Square::F8);
             attackers_to_update ^= BitBoard::from_square(Square::H8);
         } else if from == Square::E8 && to == Square::C8 {
-            pos.make_move(&Square::A8, &Square::D8);
+            pos.make_castling_move(&Square::A8, &Square::D8);
             attackers_to_update |= BitBoard::from_square(Square::D8);
             attackers_to_update ^= BitBoard::from_square(Square::A8);
         }

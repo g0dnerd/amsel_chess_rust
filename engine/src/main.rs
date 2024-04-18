@@ -11,8 +11,8 @@ fn main() {
 
     // Main CLI Loop
     let mut pos = Position::new();
-    let mut max_depth = 4;
-    
+    let mut max_depth: Option<u8> = None;
+
     if args.len() > 1 {
         match args[1].as_str() {
             "help" => {
@@ -37,7 +37,7 @@ fn main() {
                             return;
                         }
                         println!("Setting depth to {}.", d);
-                        max_depth = d;
+                        max_depth = Some(d);
                     },
                     Err(_) => {
                         println!("Error: Invalid depth provided.");
@@ -83,7 +83,7 @@ fn main() {
                             }
                         }
                     }
-                    game::make_engine_move(&mut pos, Some(max_depth));
+                    game::make_engine_move(&mut pos, max_depth);
                 }
             },
             "eve" => {
@@ -117,7 +117,7 @@ fn main() {
                             }
                         }
                     }
-                    game::make_engine_move(&mut pos, Some(max_depth));   
+                    game::make_engine_move(&mut pos, max_depth);   
                 }
             },
             _ => {
@@ -129,6 +129,8 @@ fn main() {
         println!("Running in 1 player mode.");
         while pos.state.game_result.is_ongoing() {
             pos.print_position();
+            println!("Attacked by white: {:?}", pos.attacked_by_white.squares_from_bb());
+            println!("Attacked by black: {:?}", pos.attacked_by_black.squares_from_bb());
             let eval = evaluation::main_evaluation(&mut pos);
             if eval == i32::MIN + 1 || eval == i32::MAX - 1 {
                 println!("Current evaluation: - (game over)");
@@ -175,7 +177,7 @@ fn main() {
                             continue;
                     }
                     else if o == [97, 97] {
-                        game::make_engine_move(&mut pos, None);
+                        game::make_engine_move(&mut pos, max_depth);
                         continue;
                     }
                 }

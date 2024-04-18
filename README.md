@@ -14,14 +14,18 @@ Compute and save magic bitboards by running `cargo build --bin precompute`
 ## ToDos
 * remove the second binary crate and move the precomputation work to `cargo build` for the main binary
 * add en passant
-* re-introduce multithreading
-* transposition tables
 * refactor square class to a simple index
+* add lower/upper bound flags to transposition table entries
 
 ### Done
 * dynamic storage of slider paths & attacks to further increase performance
 * cleaned up basic game loop & move generation
 * move game logic for the move loop out of main.rs
 * fixed illegal move removal while in check
+* switch to rayon for multithreading
+* add transposition tables to search module
 
 ## Known issues
+* decoupled attack map synchronization causes issues (surprise!)
+* castling sometimes not legal when it should be, 99% sure it's related to point above
+* the higher the depth, the less likely AI is to not hang a queen? still confused by whether it optimizes for the correct player

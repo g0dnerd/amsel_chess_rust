@@ -279,6 +279,7 @@ impl Position {
     }
 
     pub fn make_castling_move(&mut self, from: &Square, to: &Square) {
+        println!("Castling move from {:?} to {:?}", from, to);
         let (piece, color) = self.piece_at(*from).unwrap();
         let piece_index = match piece {
             Piece::ROOK => 0,
@@ -303,7 +304,7 @@ impl Position {
                 self.piece_bitboards[piece_index] ^= rook_mask;
                 self.piece_bitboards[piece_index] |= rook_to_mask;
             },
-            Square::G1 | Square::G8 => {
+            Square::F1 | Square::F8 => {
                 let rook_from = match color {
                     Color::White => Square::H1,
                     Color::Black => Square::H8,
