@@ -294,11 +294,16 @@ pub fn apply_move(pos: &mut Position, from: u8, to: u8) {
     update_attackers(pos, attackers_to_update);
 
     let king_square = match pos.state.active_player {
-        Color::White => (pos.piece_bitboards[4] & pos.color_bitboards[0]).squares_from_bb()[0],
-        Color::Black => (pos.piece_bitboards[4] & pos.color_bitboards[1]).squares_from_bb()[0],
+        Color::White => pos.piece_bitboards[4] & pos.color_bitboards[0],
+        Color::Black => pos.piece_bitboards[4] & pos.color_bitboards[1],
     };
 
-    // Check if the move puts the enemy king in check
-    pos.check = pos.is_square_attacked_by_color(king_square, !pos.state.active_player);
+    match king_square {
+        BitBoard(0) => panic!("No king found for active player {:?} after move history", pos.move_history),
+        _ => 
+            // Check if the move puts the enemy king in check
+            pos.check = pos.is_square_attacked_by_color(king_square.trailing_zeros() as u8, !pos.state.active_player),
+    }
+
 
 }

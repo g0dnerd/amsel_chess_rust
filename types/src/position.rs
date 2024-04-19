@@ -223,6 +223,7 @@ impl Position {
                     Color::Black => self.state.castling_rights.0 &= !Castling::BLACK_CASTLING,
                     Color::White => self.state.castling_rights.0 &= !Castling::WHITE_CASTLING,
                 }
+                self.en_passant_square = None;
             },
             Piece::ROOK => {
                 match color {
@@ -241,6 +242,7 @@ impl Position {
                         }
                     },
                 }
+                self.en_passant_square = None;
             },
             Piece::PAWN => {
                 self.state.half_move_counter = 0;

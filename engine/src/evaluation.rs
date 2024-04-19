@@ -83,12 +83,10 @@ const MATERIAL_VALUES_MIDGAME: [u32; 6] = [1276, 781, 825, 2538, 0, 124];
 const MATERIAL_VALUES_ENDGAME: [u32; 6] = [1380, 854, 915, 2682, 0, 206];
 
 pub fn main_evaluation(pos: &mut Position) -> i32 {
+    // Instantly return the lower bound of the evaluation if the position is in checkmate
+    // (seen from the side to move - if you are to move and in checkmate, eval is -infinity)
     if game::is_in_checkmate(pos) {
-        if pos.state.active_player == types::Color::White {
-            return i32::MIN + 1;
-        } else {
-            return i32::MAX - 1;
-        }
+        return i32::MIN + 1;
     }
     let player_to_move = match pos.state.active_player {
         types::Color::White => 1,

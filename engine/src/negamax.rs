@@ -171,7 +171,6 @@ fn negamax(pos: &mut Position, params: &mut SearchParameters) -> i32 {
 
     // Iterate over all legal moves
     for (from, to) in legal_moves.iter() {
-        // println!("Evaluating move {:?} -> {:?}", from, to);
         let mut new_pos = pos.clone();
         game::apply_move(&mut new_pos, *from, *to);
 
