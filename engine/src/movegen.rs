@@ -291,6 +291,10 @@ pub fn get_pawn_moves(square: u8, position: &Position) -> BitBoard {
                 if color != x_color {
                     moves |= BitBoard::from_square(offset_by_delta);
                 }
+            } else {
+                if position.en_passant_square == Some(offset_by_delta) {
+                    moves |= BitBoard::from_square(offset_by_delta);
+                }
             }
         }
     }

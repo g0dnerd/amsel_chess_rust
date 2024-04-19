@@ -184,63 +184,8 @@ pub fn update_attackers(pos: &mut Position, attackers: BitBoard) {
 
 pub fn would_give_check(pos: &mut Position, from: u8, to: u8) -> bool {
     let mut new_pos = pos.clone();
-    let mut attackers_to_update = BitBoard::empty();
-    let is_pawn = new_pos.piece_bitboards[5].contains(from);
-    let is_king = new_pos.piece_bitboards[4].contains(from);
-    let color = new_pos.piece_at(from).unwrap().1;
-
-    // List of sliders that after the move no longer have their path blocker by the moved piece
-    attackers_to_update |= get_attacking_sliders(&mut new_pos, from);
-    new_pos.make_move(&from, &to);
-
-    // List of sliders that after the move have their path blocked by the moved piece
-    attackers_to_update |= get_attacking_sliders(&mut new_pos, to);
-
-    // If the move is a castling move, move the rook as well
-    if is_king && ((from as i8 % 8) - (to as i8 % 8)).abs() > 1 {
-        if from > to {
-            new_pos.make_castling_move(&(to - 2), &(from - 1));
-            attackers_to_update |= BitBoard::from_square(from - 1);
-            attackers_to_update ^= BitBoard::from_square(to - 1);
-        } else {
-            new_pos.make_castling_move(&(to + 1), &(from + 1));
-            attackers_to_update |= BitBoard::from_square(from + 1);
-            attackers_to_update ^= BitBoard::from_square(to + 1);
-        
-        }
-    }
-
-
-    // Check for promotion, auto-promote to queen for now. Update slider blockers and attacks for the new queen
-    if is_pawn {
-        match !new_pos.state.active_player {
-            types::Color::White => {
-                if to / 8 == 7 {
-                    new_pos.promote_pawn(to, types::Piece::QUEEN);
-                }
-            },
-            types::Color::Black => {
-                if to / 8 == 0 {
-                    new_pos.promote_pawn(to, types::Piece::QUEEN);
-                }
-            }
-        }
-    }
-
-    attackers_to_update |= BitBoard::from_square(to);
-    update_attackers(&mut new_pos, attackers_to_update);
-
-    // If after these updates, the enemy king is in the list of attacked squares, the move gives check
-    let king_square = new_pos.piece_bitboards[4] & new_pos.color_bitboards[!color as usize];
-    if king_square == BitBoard::empty() {
-        panic!("Trying to check for check, but no king of color {:?} found in move history {:?}", !color, new_pos.move_history);
-    } else {
-        let king_square = king_square.squares_from_bb()[0];
-        if new_pos.is_square_attacked_by_color(king_square, color) {
-            return true;
-        }
-    }
-    false
+    apply_move(&mut new_pos, from, to);
+    new_pos.check
 }
 
 pub fn is_in_checkmate(pos: &mut Position) -> bool {
@@ -292,6 +237,9 @@ pub fn apply_move(pos: &mut Position, from: u8, to: u8) {
 
     let is_pawn = pos.piece_bitboards[5].contains(from);
     let is_king = pos.piece_bitboards[4].contains(from);
+
+    let ep_square: Option<u8> = pos.en_passant_square;
+
     pos.make_move(&from, &to);
 
     // Add sliders that now have their path blocked by the moved piece
@@ -324,6 +272,21 @@ pub fn apply_move(pos: &mut Position, from: u8, to: u8) {
                     pos.promote_pawn(to, types::Piece::QUEEN);
                 }
             }
+        }
+        // Check if the move is en passant
+        match ep_square {
+            Some(ep_square) => {
+                if to == ep_square {
+                    let ep_target = match pos.state.active_player {
+                        Color::White => to + 8,
+                        Color::Black => to - 8,
+                    };
+                    attackers_to_update |= get_attacking_sliders(pos, ep_target);
+                    pos.color_bitboards[!pos.state.active_player as usize] ^= BitBoard::from_square(ep_target);
+                    pos.piece_bitboards[5] ^= BitBoard::from_square(ep_target);
+                }
+            },
+            None => (),
         }
     }
     

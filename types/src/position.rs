@@ -24,6 +24,8 @@ pub struct Position {
 
     pub move_history: Vec<(u8, u8)>,
 
+    pub en_passant_square: Option<u8>,
+
    /*  was_last_move_capture: Option<u8>,
     castling_rights_history: Vec<CastlingRights>,
     halfmove_clock_history: Vec<u8>,
@@ -102,6 +104,7 @@ impl Position {
         let move_history = Vec::new();
         // let piece_giving_check = None;
         let check = false;
+        let en_passant_square = None;
 
         Self {
             color_bitboards: bitboards,
@@ -116,6 +119,7 @@ impl Position {
             move_history,
             /* piece_giving_check, */
             check,
+            en_passant_square,
         }    
 
     }
@@ -240,9 +244,17 @@ impl Position {
             },
             Piece::PAWN => {
                 self.state.half_move_counter = 0;
+                // Set the en passant square if the pawn moved two squares
+                if from / 8 == 1 && to / 8 == 3 {
+                    self.en_passant_square = Some(*from + 8);
+                } else if from / 8 == 6 && to / 8 == 4 {
+                    self.en_passant_square = Some(*from - 8);
+                } else {
+                    self.en_passant_square = None;
+                }
                 // self.halfmove_clock_history.push(self.state.half_move_counter);
             }
-            _ => (),
+            _ => self.en_passant_square = None,
         }
 
         let from_mask = BitBoard::from_square(*from);
