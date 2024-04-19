@@ -3,8 +3,10 @@ use std::panic;
 use types::{
     position::Position,
     bitboard::BitBoard,
-    square::*,
     Color,
+    state::GameResult,
+    Results,
+    types_utils::*,
 };
 use crate::{
     negamax,
@@ -13,67 +15,68 @@ use crate::{
     parse_input,
 };
 
-pub fn main_game_loop(humans: u8, depth: u8) {
+pub fn main_game_loop(humans: u8, depth: u8) -> Vec<(u8, u8)> {
     let mut pos = Position::new();
     match humans {
         0 => {
             println!("AI vs AI game.");
             while pos.state.game_result.is_ongoing() {
                 pos.print_position();
-                let eval = evaluation::main_evaluation(&mut pos);
-                if eval == i32::MIN + 1 || eval == i32::MAX - 1 {
-                    println!("Current evaluation: - (game over)");
-                } else {
-                    match pos.state.active_player {
-                        Color::White => println!("Current evaluation: {}", eval),
-                        Color::Black => println!("Current evaluation: {}", -eval),
-                    
-                    }
+                
+                let eval = match pos.state.active_player {
+                    Color::White => evaluation::main_evaluation(&mut pos),
+                    Color::Black => -evaluation::main_evaluation(&mut pos),
+                };
+                if i32::MIN + 1 < eval && eval < i32::MAX {
+                    println!("Current evaluation: {}", eval);   
                 }
+
                 if is_in_checkmate(&mut pos) {
-                    match pos.state.active_player {
-                        types::Color::White => {
-                            println!("Black wins by checkmate!");
-                            pos.state.game_result = types::state::GameResult(types::Results::BLACK_VICTORY);
-                            continue;
-                        },
-                        types::Color::Black => {
-                            println!("White wins by checkmate!");
-                            pos.state.game_result = types::state::GameResult(types::Results::WHITE_VICTORY);
-                            continue;
-                        }
-                    }
+                    pos.state.game_result = match pos.state.active_player {
+                        types::Color::White => GameResult(Results::BLACK_VICTORY),
+                        types::Color::Black => GameResult(Results::WHITE_VICTORY),
+                    };
+                    println!("{:?} wins by checkmate!", !pos.state.active_player);
+                    return pos.move_history;
                 }
                 make_engine_move(&mut pos, depth);
             }
+            return pos.move_history;
         },
         1 => {
             println!("Human vs AI game.");
             while pos.state.game_result.is_ongoing() {
                 pos.print_position();
-                let eval = evaluation::main_evaluation(&mut pos);
-                if eval == i32::MIN + 1 || eval == i32::MAX - 1 {
-                    println!("Current evaluation: - (game over)");
-                } else {
-                    match pos.state.active_player {
-                        Color::White => println!("Current evaluation: {}", eval),
-                        Color::Black => println!("Current evaluation: {}", -eval),
-                    
+
+                /* println!("Attacked by white:");
+                for i in 0..64 {
+                    if pos.is_square_attacked_by_color(i, Color::White) {
+                        print!("{}, ", string_from_square(i));
                     }
                 }
-                if is_in_checkmate(&mut pos) {
-                    match pos.state.active_player {
-                        types::Color::White => {
-                            println!("Black wins by checkmate!");
-                            pos.state.game_result = types::state::GameResult(types::Results::BLACK_VICTORY);
-                            continue;
-                        },
-                        types::Color::Black => {
-                            println!("White wins by checkmate!");
-                            pos.state.game_result = types::state::GameResult(types::Results::WHITE_VICTORY);
-                            continue;
-                        }
+                
+                println!("\nAttacked by black:");
+                for i in 0..64 {
+                    if pos.is_square_attacked_by_color(i, Color::Black) {
+                        print!("{}, ", string_from_square(i));
                     }
+                }
+                println!(""); */
+
+                let eval = match pos.state.active_player {
+                    Color::White => evaluation::main_evaluation(&mut pos),
+                    Color::Black => -evaluation::main_evaluation(&mut pos),
+                };
+                if i32::MIN + 1 < eval && eval < i32::MAX {
+                    println!("Current evaluation: {}", eval);   
+                }
+                if is_in_checkmate(&mut pos) {
+                    pos.state.game_result = match pos.state.active_player {
+                        types::Color::White => GameResult(Results::BLACK_VICTORY),
+                        types::Color::Black => GameResult(Results::WHITE_VICTORY),
+                    };
+                    println!("{:?} wins by checkmate!", !pos.state.active_player);
+                    return pos.move_history;
                 }
                 // Get user input in the format of "a1 a2"
                 let mut input = String::new();
@@ -85,9 +88,14 @@ pub fn main_game_loop(humans: u8, depth: u8) {
                         if o == [99, 99] {
                             continue;
                         } else if o == [98, 98] {
-                                println!("Legal moves: {:?}",
-                                    movegen::get_all_legal_moves_for_color(pos.state.active_player, &mut pos));
-                                continue;
+                            let moves = movegen::get_all_legal_moves_for_color(pos.state.active_player, &mut pos);
+                            println!("Legal moves:");
+                            for legal_move in moves {
+                                let from_string = string_from_square(legal_move.0);
+                                let to_string = string_from_square(legal_move.1);
+                                print!("{} {}, ", from_string, to_string);
+                            }
+                            continue;
                         }
                         else if o == [97, 97] {
                             make_engine_move(&mut pos, depth);
@@ -101,8 +109,8 @@ pub fn main_game_loop(humans: u8, depth: u8) {
                 }
 
                 let squares = input_legality.unwrap();
-                let square = Square::index(squares[0]);
-                let target_square = Square::index(squares[1]);
+                let square = squares[0];
+                let target_square = squares[1];
                 
                 match make_player_move(&mut pos, square, target_square) {
                     Ok(_) => (),
@@ -112,6 +120,7 @@ pub fn main_game_loop(humans: u8, depth: u8) {
                     }
                 }
             }
+            return pos.move_history;
         },
         _ => panic!("Invalid number of human players."),
     }
@@ -119,7 +128,7 @@ pub fn main_game_loop(humans: u8, depth: u8) {
 
 /* Find all sliders that are attacking the given square by using a fictitious queen that can move in all directions,
 getting all possible moves for that piece and then filtering out the sliders from the resulting bitboard. */
-pub fn get_attacking_sliders(pos: &mut Position, from: Square) -> BitBoard {
+pub fn get_attacking_sliders(pos: &mut Position, from: u8) -> BitBoard {
     let super_piece_directions: [(i8, i8); 8] = [(0, 1), (0, -1), (1, 0), (-1, 0), (1, 1), (1, -1), (-1, 1), (-1, -1)];
     let blocker_positions = movegen::get_all_actual_blockers(&super_piece_directions, from, pos);
     // TODO: This returns too many sliders - assumes every slider can move in all directions
@@ -135,251 +144,100 @@ pub fn update_attackers(pos: &mut Position, attackers: BitBoard) {
     attacker_board &= pos.color_bitboards[0] | pos.color_bitboards[1];
 
     while attacker_board != BitBoard::empty() {
-        let index = attacker_board.trailing_zeros() as usize;
-        let attacker_square = Square::index(index);
-        if let Some((piece, _color)) = pos.piece_at(attacker_square) {
+        let index = attacker_board.trailing_zeros() as u8;
+        if let Some((piece, _color)) = pos.piece_at(index) {
             match piece {
                 0 => {
-                    let attacks = movegen::get_rook_moves(attacker_square, pos);
-                    pos.update_attack_maps(attacker_square, attacks);
+                    let attacks = movegen::get_rook_moves(index, pos);
+                    pos.update_attack_maps(index, attacks);
                 },
                 1 => {
-                    let attacks = movegen::get_pseudolegal_knight_moves(attacker_square);
-                    pos.update_attack_maps(attacker_square, attacks);
+                    let attacks = movegen::get_pseudolegal_knight_moves(index);
+                    pos.update_attack_maps(index, attacks);
                 },
                 2 => {
-                    let attacks = movegen::get_bishop_moves(attacker_square, pos);
-                    pos.update_attack_maps(attacker_square, attacks);
+                    let attacks = movegen::get_bishop_moves(index, pos);
+                    pos.update_attack_maps(index, attacks);
                 },
                 3 => {
-                    let attacks = movegen::get_queen_moves(attacker_square, pos);
-                    pos.update_attack_maps(attacker_square, attacks);
+                    let attacks = movegen::get_queen_moves(index, pos);
+                    pos.update_attack_maps(index, attacks);
                 },
                 4 => {
-                    let attacks = movegen::get_king_moves(attacker_square, pos);
-                    pos.update_attack_maps(attacker_square, attacks);
+                    let attacks = movegen::get_king_moves(index, pos);
+                    pos.update_attack_maps(index, attacks);
                 },
                 5 => {
-                    let attacks = movegen::pawn_attacks(pos, attacker_square);
-                    pos.update_attack_maps(attacker_square, attacks);
+                    let attacks = movegen::pawn_attacks(pos, index);
+                    pos.update_attack_maps(index, attacks);
                 },
                 _ => (),
             }
         } else {
             panic!("Trying to update attackers on empty square {:?}, move history is {:?} and attackers are {:?}",
-                attacker_square, pos.move_history, attackers);
+            index, pos.move_history, attackers);
         }
         attacker_board.clear_lsb();
     }
     
 }
 
-pub fn make_player_move(pos: &mut Position, from: Square, to: Square) -> Result<(), &'static str> {
-    // Check if the targetted piece contains a piece of the active player's color
-    if let Some(piece) = pos.piece_at(from) {
-        if piece.1 != pos.state.active_player {
-            return Err("Piece does not belong to active player.");
-        }
-    } else {
-        return Err("Illegal move: no piece on origin square.");
-    }
-
-    let legal_moves = movegen::get_all_legal_moves_for_color(pos.state.active_player, pos);
-    if legal_moves.is_empty() {
-        match pos.state.active_player {
-            types::Color::White => {
-                let king_square = (pos.piece_bitboards[4] & pos.color_bitboards[0]).squares_from_bb()[0];
-                if pos.is_square_attacked_by_color(king_square, types::Color::Black) {
-                    println!("Black wins by checkmate.");
-                    pos.print_position();
-                    pos.state.game_result = types::state::GameResult(types::Results::BLACK_VICTORY);
-                } else {
-                    println!("Stalemate.");
-                    pos.print_position();
-                    pos.state.game_result = types::state::GameResult(types::Results::STALEMATE);
-                }
-            },
-            types::Color::Black => {
-                let king_square = (pos.piece_bitboards[4] & pos.color_bitboards[1]).squares_from_bb()[0];
-                if pos.is_square_attacked_by_color(king_square, types::Color::White) {
-                    println!("White wins by checkmate.");
-                    pos.print_position();
-                    pos.state.game_result = types::state::GameResult(types::Results::WHITE_VICTORY);
-                } else {
-                    println!("Stalemate.");
-                    pos.print_position();
-                    pos.state.game_result = types::state::GameResult(types::Results::STALEMATE);
-                }
-            }
-        }
-    }
-
-    // Check if the move is legal by checking if it is in the list of legal moves
-    if !legal_moves.contains(&(from, to)) {
-        return Err("Not a legal move.");
-    }
-
-    let mut attackers_to_update = BitBoard::empty();
-
-    // Add sliders that are no longer blocked by the moved piece to the list of pieces to update
-    attackers_to_update |= get_attacking_sliders(pos, from);
-
-    let is_pawn = pos.piece_bitboards[5].contains(from);
-    let is_king = pos.piece_bitboards[4].contains(from);
-    pos.make_move(&from, &to);
-
-    // Add sliders that now have their path blocked by the moved piece
-    attackers_to_update |= get_attacking_sliders(pos, to);
-
-    // If the move is a castling move, move the rook as well
-    if is_king {
-        if from == Square::E1 && to == Square::G1 {
-            pos.make_castling_move(&Square::H1, &Square::F1);
-            attackers_to_update |= BitBoard::from_square(Square::F1);
-            attackers_to_update ^= BitBoard::from_square(Square::H1);
-        } else if from == Square::E1 && to == Square::C1 {
-            pos.make_castling_move(&Square::A1, &Square::D1);
-            attackers_to_update |= BitBoard::from_square(Square::D1);
-            attackers_to_update ^= BitBoard::from_square(Square::A1);
-        } else if from == Square::E8 && to == Square::G8 {
-            pos.make_castling_move(&Square::H8, &Square::F8);
-            attackers_to_update |= BitBoard::from_square(Square::F8);
-            attackers_to_update ^= BitBoard::from_square(Square::H8);
-        } else if from == Square::E8 && to == Square::C8 {
-            pos.make_castling_move(&Square::A8, &Square::D8);
-            attackers_to_update |= BitBoard::from_square(Square::D8);
-            attackers_to_update ^= BitBoard::from_square(Square::A8);
-        }
-    }
-
-    // Check for promotion, auto-promote to queen for now. Update slider blockers and attacks for the new queen
-    if is_pawn {
-        let rank = to.rank();
-        match !pos.state.active_player {
-            types::Color::White => {
-                if rank == Rank::Eighth {
-                    pos.promote_pawn(to, types::Piece::QUEEN);
-                }
-            },
-            types::Color::Black => {
-                if rank == Rank::First {
-                    pos.promote_pawn(to, types::Piece::QUEEN);
-                }
-            }
-        }
-    }
-    
-    attackers_to_update |= BitBoard::from_square(to);
-    println!("Make player move calling attacker update with attackers {:?}", attackers_to_update.squares_from_bb());
-    update_attackers(pos, attackers_to_update);
-
-    let king_square = match pos.state.active_player {
-        Color::White => (pos.piece_bitboards[4] & pos.color_bitboards[0]).squares_from_bb()[0],
-        Color::Black => (pos.piece_bitboards[4] & pos.color_bitboards[1]).squares_from_bb()[0],
-    };
-    
-    // Check if the move puts the enemy king in check
-    pos.check = pos.is_square_attacked_by_color(king_square, !pos.state.active_player);
-
-    Ok(())
-}
-
-pub fn make_engine_move(pos: &mut Position, depth: u8) {  
-    let best_move = negamax::find_best_move(pos, depth);
-    let (from, target_square) = best_move;
-
-    println!("AI move: {:?} {:?}", from, target_square);
-
-    make_specific_engine_move(pos, from, target_square);
-}
-
-pub fn would_give_check(pos: &mut Position, from: &Square, to: &Square) -> bool {
+pub fn would_give_check(pos: &mut Position, from: u8, to: u8) -> bool {
     let mut new_pos = pos.clone();
     let mut attackers_to_update = BitBoard::empty();
-    let is_pawn = new_pos.piece_bitboards[5].contains(*from);
-    let is_king = new_pos.piece_bitboards[4].contains(*from);
-    let color = new_pos.piece_at(*from).unwrap().1;
+    let is_pawn = new_pos.piece_bitboards[5].contains(from);
+    let is_king = new_pos.piece_bitboards[4].contains(from);
+    let color = new_pos.piece_at(from).unwrap().1;
 
     // List of sliders that after the move no longer have their path blocker by the moved piece
-    attackers_to_update |= get_attacking_sliders(&mut new_pos, *from);
-    new_pos.make_move(from, to);
+    attackers_to_update |= get_attacking_sliders(&mut new_pos, from);
+    new_pos.make_move(&from, &to);
 
     // List of sliders that after the move have their path blocked by the moved piece
-    attackers_to_update |= get_attacking_sliders(&mut new_pos, *to);
+    attackers_to_update |= get_attacking_sliders(&mut new_pos, to);
 
     // If the move is a castling move, move the rook as well
-    if is_king {
-        if *from == Square::E1 && *to == Square::G1 {
-            new_pos.make_move(&Square::H1, &Square::F1);
-            attackers_to_update |= BitBoard::from_square(Square::F1);
-            attackers_to_update ^= BitBoard::from_square(Square::H1);
-        } else if *from == Square::E1 && *to == Square::C1 {
-            new_pos.make_move(&Square::A1, &Square::D1);
-            attackers_to_update |= BitBoard::from_square(Square::D1);
-            attackers_to_update ^= BitBoard::from_square(Square::A1);
-        } else if *from == Square::E8 && *to == Square::G8 {
-            new_pos.make_move(&Square::H8, &Square::F8);
-            attackers_to_update |= BitBoard::from_square(Square::F8);
-            attackers_to_update ^= BitBoard::from_square(Square::H8);
-        } else if *from == Square::E8 && *to == Square::C8 {
-            new_pos.make_move(&Square::A8, &Square::D8);
-            attackers_to_update |= BitBoard::from_square(Square::D8);
-            attackers_to_update ^= BitBoard::from_square(Square::A8);
+    if is_king && ((from as i8 % 8) - (to as i8 % 8)).abs() > 1 {
+        if from > to {
+            new_pos.make_castling_move(&(to - 2), &(from - 1));
+            attackers_to_update |= BitBoard::from_square(from - 1);
+            attackers_to_update ^= BitBoard::from_square(to - 1);
+        } else {
+            new_pos.make_castling_move(&(to + 1), &(from + 1));
+            attackers_to_update |= BitBoard::from_square(from + 1);
+            attackers_to_update ^= BitBoard::from_square(to + 1);
+        
         }
     }
 
+
     // Check for promotion, auto-promote to queen for now. Update slider blockers and attacks for the new queen
     if is_pawn {
-        let rank = to.rank();
         match !new_pos.state.active_player {
             types::Color::White => {
-                if rank == Rank::Eighth {
-                    new_pos.promote_pawn(*to, types::Piece::QUEEN);
+                if to / 8 == 7 {
+                    new_pos.promote_pawn(to, types::Piece::QUEEN);
                 }
             },
             types::Color::Black => {
-                if rank == Rank::First {
-                    new_pos.promote_pawn(*to, types::Piece::QUEEN);
+                if to / 8 == 0 {
+                    new_pos.promote_pawn(to, types::Piece::QUEEN);
                 }
             }
         }
     }
 
-    attackers_to_update |= BitBoard::from_square(*to);
+    attackers_to_update |= BitBoard::from_square(to);
     update_attackers(&mut new_pos, attackers_to_update);
 
     // If after these updates, the enemy king is in the list of attacked squares, the move gives check
-    match !color {
-        Color::White => {
-            let king_square = 
-                panic::catch_unwind(|| (new_pos.piece_bitboards[4] & new_pos.color_bitboards[0]).squares_from_bb()[0]);
-            
-            match king_square {
-                Ok(king_square) => {
-                    if new_pos.is_square_attacked_by_color(king_square, Color::Black) {
-                        return true;
-                    }
-                },
-                Err(_) => {
-                    panic!("King square not found in would_give_check with move history {:?} and move {:?} {:?}",
-                        new_pos.move_history, from, to);
-                }
-            }
-        },
-        Color::Black => {
-            let king_square = 
-                panic::catch_unwind(|| (new_pos.piece_bitboards[4] & new_pos.color_bitboards[1]).squares_from_bb()[0]);
-            match king_square {
-                Ok(king_square) => {
-                    if new_pos.is_square_attacked_by_color(king_square, Color::White) {
-                        return true;
-                    }
-                },
-                Err(_) => {
-                    panic!("King square not found in would_give_check with move history {:?} and move {:?} {:?}",
-                        new_pos.move_history, from, to);
-                }
-            }
+    let king_square = new_pos.piece_bitboards[4] & new_pos.color_bitboards[!color as usize];
+    if king_square == BitBoard::empty() {
+        panic!("Trying to check for check, but no king of color {:?} found in move history {:?}", !color, new_pos.move_history);
+    } else {
+        let king_square = king_square.squares_from_bb()[0];
+        if new_pos.is_square_attacked_by_color(king_square, color) {
+            return true;
         }
     }
     false
@@ -395,7 +253,38 @@ pub fn is_in_checkmate(pos: &mut Position) -> bool {
     return false;
 }
 
-pub fn make_specific_engine_move(pos: &mut Position, from: Square, to: Square) {
+pub fn make_player_move(pos: &mut Position, from: u8, to: u8) -> Result<(), &'static str> {
+    // Check if the targetted piece contains a piece of the active player's color
+    if let Some(piece) = pos.piece_at(from) {
+        if piece.1 != pos.state.active_player {
+            return Err("Piece does not belong to active player.");
+        }
+    } else {
+        return Err("Illegal move: no piece on origin square.");
+    }
+
+    let legal_moves = movegen::get_all_legal_moves_for_color(pos.state.active_player, pos);
+
+    // Check if the move is legal by checking if it is in the list of legal moves
+    if !legal_moves.contains(&(from, to)) {
+        return Err("Not a legal move.");
+    }
+
+    apply_move(pos, from, to);
+
+    Ok(())
+}
+
+pub fn make_engine_move(pos: &mut Position, depth: u8) {  
+    let best_move = negamax::find_best_move(pos, depth);
+    let (from, to) = best_move;
+
+    println!("AI move: {} {}", string_from_square(from), string_from_square(to));
+
+    apply_move(pos, from, to);
+}
+
+pub fn apply_move(pos: &mut Position, from: u8, to: u8) {
     let mut attackers_to_update = BitBoard::empty();
 
     // Add sliders that are no longer blocked by the moved piece to the list of pieces to update
@@ -409,37 +298,29 @@ pub fn make_specific_engine_move(pos: &mut Position, from: Square, to: Square) {
     attackers_to_update |= get_attacking_sliders(pos, to);
 
     // If the move is a castling move, move the rook as well
-    if is_king {
-        if from == Square::E1 && to == Square::G1 {
-            pos.make_castling_move(&Square::H1, &Square::F1);
-            attackers_to_update |= BitBoard::from_square(Square::F1);
-            attackers_to_update ^= BitBoard::from_square(Square::H1);
-        } else if from == Square::E1 && to == Square::C1 {
-            pos.make_castling_move(&Square::A1, &Square::D1);
-            attackers_to_update |= BitBoard::from_square(Square::D1);
-            attackers_to_update ^= BitBoard::from_square(Square::A1);
-        } else if from == Square::E8 && to == Square::G8 {
-            pos.make_castling_move(&Square::H8, &Square::F8);
-            attackers_to_update |= BitBoard::from_square(Square::F8);
-            attackers_to_update ^= BitBoard::from_square(Square::H8);
-        } else if from == Square::E8 && to == Square::C8 {
-            pos.make_castling_move(&Square::A8, &Square::D8);
-            attackers_to_update |= BitBoard::from_square(Square::D8);
-            attackers_to_update ^= BitBoard::from_square(Square::A8);
+    if is_king && ((from as i8 % 8) - (to as i8 % 8)).abs() > 1 {
+        if from > to {
+            pos.make_castling_move(&(to - 2), &(from - 1));
+            attackers_to_update |= BitBoard::from_square(from - 1);
+            attackers_to_update ^= BitBoard::from_square(to - 1);
+        } else {
+            pos.make_castling_move(&(to + 1), &(from + 1));
+            attackers_to_update |= BitBoard::from_square(from + 1);
+            attackers_to_update ^= BitBoard::from_square(to + 1);
+        
         }
     }
 
     // Check for promotion, auto-promote to queen for now. Update slider blockers and attacks for the new queen
     if is_pawn {
-        let rank = to.rank();
         match !pos.state.active_player {
             types::Color::White => {
-                if rank == Rank::Eighth {
+                if to / 8 == 7 {
                     pos.promote_pawn(to, types::Piece::QUEEN);
                 }
             },
             types::Color::Black => {
-                if rank == Rank::First {
+                if to / 8 == 0 {
                     pos.promote_pawn(to, types::Piece::QUEEN);
                 }
             }

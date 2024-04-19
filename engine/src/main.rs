@@ -1,31 +1,31 @@
 use std::env;
 use engine::game;
+use types::types_utils::string_from_square;
 
 fn main() {
     env::set_var("RUST_BACKTRACE", "1");
-    env::set_var("RAYON_NUM_THREADS", "8");
+    env::set_var("RAYON_NUM_THREADS", "5");
 
     // Get game settings from user
     let mut input_human_players = String::new();
-    println!("Enter the amount of human players in this game.");
+    println!("Enter the amount of human players in this game. Amount can be 0 or 1.");
     std::io::stdin().read_line(&mut input_human_players).unwrap();
     let input = input_human_players.trim();
     let human_players = match input.parse::<u8>() {
         Ok(n) => {
-            if n > 2 {
-                println!("Error: Maximum of 2 human players allowed.");
+            if n > 1 {
+                println!("Error: Maximum of 1 human player allowed.");
                 return;
             }
             println!("Setting human players to {}.", n);
             n
         },
         Err(_) => {
-            println!("Error: Invalid input. Please enter a number from 0 to 2.");
+            println!("Error: Invalid input. Please enter a number from 0 to 1.");
             return;
         }
     };
 
-    // Get the depth of the search algorithm
     let mut input_depth = String::new();
     println!("Enter the depth of the search algorithm. Minimum 1, maximum 8.");
     std::io::stdin().read_line(&mut input_depth).unwrap();
@@ -46,7 +46,10 @@ fn main() {
     };
 
     // Main game loop
-    game::main_game_loop(human_players, depth);
+    let move_history = game::main_game_loop(human_players, depth);
+    for mv in move_history {
+        println!("{} {}, ", string_from_square(mv.0), string_from_square(mv.1));
+    }
 
     // Wait for the user to press enter before closing the program
     let mut input = String::new();
@@ -57,10 +60,7 @@ fn main() {
 
 #[cfg(test)]
 mod tests {
-    use types::{
-        position::Position,
-        square::Square,
-    };
+    use types::position::Position;
     use engine::movegen;
     use types::bitboard::BitBoard;
 
@@ -73,7 +73,7 @@ mod tests {
     #[test]
     fn moves_rook_b1_initial() {
         let test_pos = Position::new();
-        let square = Square::B1;
+        let square = 1;
         let moves = movegen::get_rook_moves(square, &test_pos);
         assert_eq!(moves, BitBoard::empty());
     }
@@ -81,7 +81,7 @@ mod tests {
     #[test]
     fn moves_knight_b1_initial() {
         let test_pos = Position::new();
-        let square = Square::B1;
+        let square = 1;
         let moves = movegen::get_knight_moves(square, &test_pos);
         assert_eq!(moves, BitBoard::from_u64(327680));
     }
@@ -89,7 +89,7 @@ mod tests {
     #[test]
     fn moves_knight_b8_initial() {
         let test_pos = Position::new();
-        let square = Square::B8;
+        let square = 57;
         let moves = movegen::get_knight_moves(square, &test_pos);
         assert_eq!(moves, BitBoard::from_u64(5497558138880));
     }
@@ -97,7 +97,7 @@ mod tests {
     #[test]
     fn moves_bishop_c1_initial() {
         let test_pos = Position::new();
-        let square = Square::C1;
+        let square = 2;
         let moves = movegen::get_bishop_moves(square, &test_pos);
         assert_eq!(moves, BitBoard::empty());
     }
@@ -105,7 +105,7 @@ mod tests {
     #[test]
     fn moves_queen_d1_initial() {
         let test_pos = Position::new();
-        let square = Square::D1;
+        let square = 3;
         let moves = movegen::get_queen_moves(square, &test_pos);
         assert_eq!(moves, BitBoard::empty());
     }
@@ -113,7 +113,7 @@ mod tests {
     #[test]
     fn moves_king_e1_initial() {
         let test_pos = Position::new();
-        let square = Square::E1;
+        let square = 4;
         let moves = movegen::get_king_moves(square, &test_pos);
         assert_eq!(moves, BitBoard::empty());
     }
@@ -121,7 +121,7 @@ mod tests {
     #[test]
     fn moves_pawn_f2_initial() {
         let test_pos = Position::new();
-        let square = Square::F2;
+        let square = 13;
         let moves = movegen::get_pawn_moves(square, &test_pos);
         assert_eq!(moves, BitBoard::from_u64(538968064));
     }
@@ -129,7 +129,7 @@ mod tests {
     #[test]
     fn moves_pawn_h7_initial() {
         let test_pos = Position::new();
-        let square = Square::H7;
+        let square = 55;
         let moves = movegen::get_pawn_moves(square, &test_pos);
         assert_eq!(moves, BitBoard::from_u64(141287244169216));
     }
@@ -146,7 +146,7 @@ mod tests {
     #[should_panic(expected = "called on empty square")]
     fn moves_empty_square() {
         let test_pos = Position::new();
-        let square = Square::D4;
+        let square = 27;
         let _moves = (movegen::get_king_moves(square, &test_pos),
                      movegen::get_queen_moves(square, &test_pos),
                      movegen::get_bishop_moves(square, &test_pos),

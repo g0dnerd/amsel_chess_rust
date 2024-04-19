@@ -1,17 +1,20 @@
-use std::sync::atomic::AtomicBool;
 use std::{cmp,
     time::Instant,
     collections::HashMap,
-    sync::Mutex,
+    sync::{
+        Mutex,
+        atomic::AtomicBool,
+    },
 };
 use rayon::prelude::*;
 use rand::seq::SliceRandom;
 use lazy_static::lazy_static;
 use indicatif::{ProgressBar, ProgressStyle};
-use crate::movegen;
-use crate::game;
-use crate::evaluation;
-use types::square::Square;
+use crate::{
+    movegen,
+    game,
+    evaluation,
+};
 use types::position::Position;
 use precompute::rng;
 
@@ -40,7 +43,7 @@ struct TranspositionEntry {
 
 struct SearchResult {
     score: i32,
-    best_move: (Square, Square),
+    best_move: (u8, u8),
 }
 
 struct SearchParameters{
@@ -73,7 +76,7 @@ fn initialize_zobrist_keys() -> [[u64; NUM_SQUARES]; NUM_PIECE_TYPES] {
 fn calculate_hash(pos: &Position) -> u64 {
     let mut hash = 0;
     for square in 0..NUM_SQUARES {
-        if let Some((piece, _color)) = pos.piece_at(Square::index(square)) {
+        if let Some((piece, _color)) = pos.piece_at(square as u8) {
             hash ^= ZOBRIST_KEYS[piece as usize][square];
         }
     }
@@ -124,11 +127,11 @@ fn store_entry(hash: u64, entry: TranspositionEntry) {
 }
 
 // Returns all legal moves for the current position ordered by rough likelihood of being played
-fn order_moves(mut moves: Vec<(Square, Square)>, pos: &mut Position) -> Vec<(Square, Square)> {
+fn order_moves(mut moves: Vec<(u8, u8)>, pos: &mut Position) -> Vec<(u8, u8)> {
     moves.shuffle(&mut rand::thread_rng());
     moves.sort_by_key(|&(start, end)| {
         match () {
-            () if game::would_give_check(pos, &start, &end) => 0, 
+            () if game::would_give_check(pos, start, end) => 0, 
             () if pos.is_promotion(&start, &end) => 1,
             () if pos.is_capture(&end) => 2,
             _ => 3,
@@ -170,7 +173,7 @@ fn negamax(pos: &mut Position, params: &mut SearchParameters) -> i32 {
     for (from, to) in legal_moves.iter() {
         // println!("Evaluating move {:?} -> {:?}", from, to);
         let mut new_pos = pos.clone();
-        game::make_specific_engine_move(&mut new_pos, *from, *to);
+        game::apply_move(&mut new_pos, *from, *to);
 
         score = cmp::max(score, -negamax(&mut new_pos, &mut SearchParameters {
             alpha: -params.beta,
@@ -196,8 +199,11 @@ fn negamax(pos: &mut Position, params: &mut SearchParameters) -> i32 {
 
 }
 
-pub fn find_best_move(pos: &mut Position, depth: u8) -> (Square, Square) {
+pub fn find_best_move(pos: &mut Position, depth: u8) -> (u8, u8) {
     let start_time = Instant::now();
+
+    // Clear transposition table
+    TRANSPOSITION_TABLE.lock().unwrap().clear();
 
     MATE_IN_ONE_FOUND.store(false, std::sync::atomic::Ordering::Relaxed);
 
@@ -223,7 +229,7 @@ pub fn find_best_move(pos: &mut Position, depth: u8) -> (Square, Square) {
     let results: Vec<SearchResult> = legal_moves.par_iter().
         map(|&(from, to)| {
             let mut new_pos = pos.clone();
-            game::make_specific_engine_move(&mut new_pos, from, to);
+            game::apply_move(&mut new_pos, from, to);
             if game::is_in_checkmate(&mut new_pos) {
                 MATE_IN_ONE_FOUND.store(true, std::sync::atomic::Ordering::Relaxed);
                 return SearchResult {
@@ -245,7 +251,7 @@ pub fn find_best_move(pos: &mut Position, depth: u8) -> (Square, Square) {
         }).collect();
     let best_result = results.into_iter().max_by_key(|r| r.score).unwrap_or(SearchResult {
         score: i32::MIN,
-        best_move: (Square::A1, Square::A1),
+        best_move: (0, 0),
     });
     
     bar.finish();

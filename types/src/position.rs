@@ -1,5 +1,5 @@
 use crate::bitboard::BitBoard;
-use crate::square::Square;
+use crate::types_utils::string_from_square;
 use crate::{Color, Castling, Results, get_piece_representation};
 use crate::state::{State, GameResult, /* CastlingRights */};
 use crate::Piece;
@@ -22,7 +22,7 @@ pub struct Position {
     pub attacked_by_white: BitBoard,
     pub attacked_by_black: BitBoard,
 
-    pub move_history: Vec<(Square, Square)>,
+    pub move_history: Vec<(u8, u8)>,
 
    /*  was_last_move_capture: Option<u8>,
     castling_rights_history: Vec<CastlingRights>,
@@ -123,7 +123,7 @@ impl Position {
     // Prints out a visual representation of a given board state.
     pub fn print_position(&self) {
         let mut board = [[0; 8]; 8];
-        for square in Square::ALL {
+        for square in 0..64 {
             match self.piece_at(square) {
                 Some((piece, color)) => {
                     let x = square as usize % 8;
@@ -146,9 +146,8 @@ impl Position {
     }
 
     // Returns the piece at a given square or None if the square is empty
-    pub fn piece_at(&self, square: Square) -> Option<(u8, Color)> {
-        let index = square as usize;
-        let mask: u64 = 1 << index;
+    pub fn piece_at(&self, square: u8) -> Option<(u8, Color)> {
+        let mask: u64 = 1 << square;
         let color_mask = if self.color_bitboards[0].0 & mask != 0 {
             Color::White
         } else {
@@ -175,7 +174,7 @@ impl Position {
         self.color_bitboards[0] | self.color_bitboards[1]
     }
 
-    pub fn make_move(&mut self, from: &Square, to: &Square) {
+    pub fn make_move(&mut self, from: &u8, to: &u8) {
         let (piece, color) = self.piece_at(*from).unwrap();
         // Check for captures and update halfmove counter
         if self.piece_at(*to).is_some() {
@@ -193,10 +192,10 @@ impl Position {
             };
             if captured_piece_index == 0 {
                 match *to {
-                    Square::A8 => self.state.castling_rights.0 &= !Castling::BLACK_QUEEN_SIDE,
-                    Square::H8 => self.state.castling_rights.0 &= !Castling::BLACK_KING_SIDE,
-                    Square::A1 => self.state.castling_rights.0 &= !Castling::WHITE_QUEEN_SIDE,
-                    Square::H1 => self.state.castling_rights.0 &= !Castling::WHITE_KING_SIDE,
+                    56 => self.state.castling_rights.0 &= !Castling::BLACK_QUEEN_SIDE,
+                    63 => self.state.castling_rights.0 &= !Castling::BLACK_KING_SIDE,
+                    0 => self.state.castling_rights.0 &= !Castling::WHITE_QUEEN_SIDE,
+                    7 => self.state.castling_rights.0 &= !Castling::WHITE_KING_SIDE,
                     _ => (),
                 }
             }
@@ -224,16 +223,16 @@ impl Position {
             Piece::ROOK => {
                 match color {
                     Color::Black => {
-                        if *from == Square::A8 {
+                        if *from == 56 {
                             self.state.castling_rights.0 &= !Castling::BLACK_QUEEN_SIDE;
-                        } else if *from == Square::H8 {
+                        } else if *from == 63 {
                             self.state.castling_rights.0 &= !Castling::BLACK_KING_SIDE;
                         }
                     },
                     Color::White => {
-                        if *from == Square::A1 {
+                        if *from == 0 {
                             self.state.castling_rights.0 &= !Castling::WHITE_QUEEN_SIDE;
-                        } else if *from == Square::H1 {
+                        } else if *from == 7 {
                             self.state.castling_rights.0 &= !Castling::WHITE_KING_SIDE;
                         }
                     },
@@ -274,46 +273,32 @@ impl Position {
         // Assert that the color bitboards match the piece bitboards
         assert_eq!(self.color_bitboards[0] | self.color_bitboards[1],
             self.piece_bitboards[0] | self.piece_bitboards[1] | self.piece_bitboards[2] | self.piece_bitboards[3] | self.piece_bitboards[4] | self.piece_bitboards[5],
-            "Inconsistent position initialization. Color bitboards do not match piece bitboards.");
+            "Inconsistent position initialization. Color bitboards do not match piece bitboards in move history {:?}.", self);
         // TODO: update en passant square
     }
 
-    pub fn make_castling_move(&mut self, from: &Square, to: &Square) {
-        let (piece, color) = self.piece_at(*from).unwrap();
-        let piece_index = match piece {
+    pub fn make_castling_move(&mut self, from: &u8, to: &u8) {
+        // println!("Making castling move from {} to {}", from, to);
+        let piece = self.piece_at(*from);
+        match piece {
+            Some((Piece::KING, _color)) => (),
+            Some((Piece::ROOK, _color)) => (),
+            _ => panic!("Trying to make castling move from {} to {} with move history {:?}",
+                string_from_square(*from), string_from_square(*to), self.move_history),
+        }
+        let piece_type = piece.unwrap().0;
+        let color = piece.unwrap().1;
+        let piece_index = match piece_type {
             Piece::ROOK => 0,
             Piece::KING => 4,
             _ => panic!("Invalid piece"),
         };
 
         match to {
-            Square::C1 | Square::C8 => {
-                let rook_from = match color {
-                    Color::White => Square::A1,
-                    Color::Black => Square::A8,
-                };
-                let rook_to = match color {
-                    Color::White => Square::D1,
-                    Color::Black => Square::D8,
-                };
-                let rook_mask = BitBoard::from_square(rook_from);
-                let rook_to_mask = BitBoard::from_square(rook_to);
-                self.color_bitboards[color as usize] ^= rook_mask;
-                self.color_bitboards[color as usize] |= rook_to_mask;
-                self.piece_bitboards[piece_index] ^= rook_mask;
-                self.piece_bitboards[piece_index] |= rook_to_mask;
-            },
-            Square::F1 | Square::F8 => {
-                let rook_from = match color {
-                    Color::White => Square::H1,
-                    Color::Black => Square::H8,
-                };
-                let rook_to = match color {
-                    Color::White => Square::F1,
-                    Color::Black => Square::F8,
-                };
-                let rook_mask = BitBoard::from_square(rook_from);
-                let rook_to_mask = BitBoard::from_square(rook_to);
+            // Check if the destination square for the rook is D1, D8, F1 or F8
+            3 | 5 | 59 | 61  => {
+                let rook_to_mask = BitBoard::from_square(*to);
+                let rook_mask = BitBoard::from_square(*from);
                 self.color_bitboards[color as usize] ^= rook_mask;
                 self.color_bitboards[color as usize] |= rook_to_mask;
                 self.piece_bitboards[piece_index] ^= rook_mask;
@@ -376,19 +361,19 @@ impl Position {
     }
  */
 
-    pub fn update_attack_maps(&mut self, attacker_square: Square, attacks: BitBoard) {
+    pub fn update_attack_maps(&mut self, attacker_square: u8, attacks: BitBoard) {
         self.attack_bitboards[attacker_square as usize] = attacks;
     }
 
     /* Returns true if the given square is under attack by the given color.
     / attack_bitboards contains a bitboard for every square that contains information which other squares the piece
     on that square attacks, if any. */ 
-    pub fn is_square_attacked_by_color(&self, square: Square, color: Color) -> bool {
+    pub fn is_square_attacked_by_color(&self, square: u8, color: Color) -> bool {
         for i in 0..64 {
             // If the square is attacked by a piece on square i
             if self.attack_bitboards[i].contains(square) {
                 // Check if the piece on square i is of the attacking color
-                if self.color_bitboards[color as usize].contains(Square::index(i)) {
+                if self.color_bitboards[color as usize].contains(i as u8) {
                     return true;
                 }
             }
@@ -400,26 +385,26 @@ impl Position {
     pub fn all_attacked_squares(&self, color: Color) -> BitBoard {
         let mut attacked_squares = BitBoard::empty();
         for i in 0..64 {
-            if self.color_bitboards[color as usize].contains(Square::index(i)) {
+            if self.color_bitboards[color as usize].contains(i as u8) {
                 attacked_squares |= self.attack_bitboards[i];
             }
         }
         attacked_squares
     }
 
-    pub fn is_promotion(&self, start: &Square, end: &Square) -> bool {
+    pub fn is_promotion(&self, start: &u8, end: &u8) -> bool {
         let (piece, color) = self.piece_at(*start).unwrap();
         if piece == Piece::PAWN {
-            if color == Color::White && end.rank_index() == 7 {
+            if color == Color::White && end / 8 == 7 {
                 return true;
-            } else if color == Color::Black && end.rank_index() == 0 {
+            } else if color == Color::Black && end / 8 == 0 {
                 return true;
             }
         }
         false
     }
 
-    pub fn promote_pawn(&mut self, square: Square, target_piece: u8) {
+    pub fn promote_pawn(&mut self, square: u8, target_piece: u8) {
         let mask = BitBoard::from_square(square);
         let color = if self.color_bitboards[0].contains(square) {
             Color::White
@@ -456,7 +441,7 @@ impl Position {
         new_position
     }
 
-    pub fn is_capture(&self, end: &Square) -> bool {
+    pub fn is_capture(&self, end: &u8) -> bool {
         if let Some(piece) = self.piece_at(*end) {
             if piece.1 != self.state.active_player {
                 return true;

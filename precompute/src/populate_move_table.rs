@@ -1,6 +1,8 @@
 use std::io::prelude::*;
-use types::bitboard::BitBoard;
-use types::square::Square;
+use types::{
+    bitboard::BitBoard,
+    types_utils::*,
+};
 
 use crate::magics::*;
 
@@ -12,14 +14,14 @@ fn magic_index(entry: &MagicTableEntry, blockers: BitBoard) -> usize {
     entry.offset as usize + index
 }
 
-fn slider_moves(slider_deltas: &[(i8, i8)], square: Square, blockers: BitBoard) -> BitBoard {
+fn slider_moves(slider_deltas: &[(i8, i8)], square: u8, blockers: BitBoard) -> BitBoard {
     let mut moves = BitBoard::empty();
     for &(df, dr) in slider_deltas {
         let mut ray = square;
         while !blockers.contains(ray) {
-            if let Some(shifted) = ray.try_offset(df, dr) {
+            if let Some(shifted) = try_square_offset(ray, df, dr) {
                 ray = shifted;
-                moves |= ray.bitboard();
+                moves |= BitBoard::from_square(ray);
             } else {
                 break;
             }
@@ -31,16 +33,16 @@ fn slider_moves(slider_deltas: &[(i8, i8)], square: Square, blockers: BitBoard) 
 pub fn make_table(
     table_size: usize,
     slider_deltas: &[(i8, i8)],
-    magics: &[MagicTableEntry; Square::NUM],
+    magics: &[MagicTableEntry; 64],
 ) -> Vec<BitBoard> {
     let mut table = vec![BitBoard::empty(); table_size];
-    for &square in &Square::ALL {
-        let magic_entry = &magics[square as usize];
+    for square in 0..64 {
+        let magic_entry = &magics[square];
         let mask = BitBoard(magic_entry.mask);
 
         let mut blockers = BitBoard::empty();
         loop {
-            let moves = slider_moves(slider_deltas, square, blockers);
+            let moves = slider_moves(slider_deltas, square as u8, blockers);
             table[magic_index(magic_entry, blockers)] = moves;
 
             // Carry-Rippler trick that enumerates all subsets of the mask, getting us all blockers.
@@ -65,7 +67,7 @@ pub fn write_table(name: &str, table: &[BitBoard], out: &mut impl Write) -> std:
 
 pub fn write_magics(
     name: &str,
-    magics: &[MagicTableEntry; Square::NUM],
+    magics: &[MagicTableEntry; 64],
     out: &mut impl Write,
 ) -> std::io::Result<()> {
     write!(

@@ -1,7 +1,5 @@
 use std::ops::*;
 
-use crate::square::Square;
-
 // Module for the BitBoard struct
 // A BitBoard is a 64-bit integer that represents the state of a chess board.
 // They are implemented here with bit 0 being a1 and bit 63 being h8.
@@ -82,8 +80,8 @@ impl BitBoard {
         Self(u)
     }
 
-    pub fn from_square(square: Square) -> Self {
-        Self(1 << square as usize)
+    pub fn from_square(square: u8) -> Self {
+        Self(1 << square)
     }
 
     pub fn from_index(index: usize) -> Self {
@@ -91,8 +89,8 @@ impl BitBoard {
         Self(1 << index)
     }
 
-    pub fn remove_square(&mut self, square: Square) {
-        self.0 &= !(1 << square as usize);
+    pub fn remove_square(&mut self, square: u8) {
+        self.0 &= !(1 << square);
     }
 
     pub fn count_ones(&self) -> u32 {
@@ -103,7 +101,7 @@ impl BitBoard {
         self.0 == 0
     }
 
-    pub fn contains(self, square: Square) -> bool {
+    pub fn contains(self, square: u8) -> bool {
         !(self & BitBoard::from_index(square as usize)).is_empty()
     }
 
@@ -135,11 +133,11 @@ impl BitBoard {
         Self((self.0 & 0x7F7F_7F7F_7F7F_7F7F) >> 9)
     }
 
-    pub fn squares_from_bb(&self) -> Vec<Square> {
+    pub fn squares_from_bb(&self) -> Vec<u8> {
         let mut squares = Vec::new();
         let mut bb = self.0;
         while bb != 0 {
-            let square = Square::index(bb.trailing_zeros() as usize);
+            let square = bb.trailing_zeros() as u8;
             squares.push(square);
             bb &= bb - 1;
         }
@@ -151,8 +149,8 @@ impl BitBoard {
     pub fn colorflip(self) -> Self {
         let mut flipped_self = BitBoard::empty();
         for i in 0..64 {
-            if self.contains(Square::index(i)) {
-                flipped_self |= BitBoard::from_index(i ^ 56);
+            if self.contains(i) {
+                flipped_self |= BitBoard::from_index(i as usize ^ 56);
             }
         }
         flipped_self

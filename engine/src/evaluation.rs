@@ -1,7 +1,9 @@
 use std::cmp;
-use types::position::Position;
-use types::bitboard::BitBoard;
-use types::square::Square;
+use types::{
+    position::Position,
+    bitboard::BitBoard,
+    types_utils::*,
+};
 use crate::movegen;
 use crate::game;
 
@@ -265,7 +267,7 @@ fn get_piece_square_table_value_midgame(pos: &Position) -> i32 {
     for piece in 0..6 {
         let piece_bitboard = pos.piece_bitboards[piece] & pos.color_bitboards[0];
         for square in 0..64 {
-            if !(piece_bitboard & BitBoard::from_square(Square::index(square))).is_empty() {
+            if !(piece_bitboard & BitBoard::from_square(square)).is_empty() {
                 let rank = cmp::min(7- square/8, square / 8);
                 let file = square % 8;
                 match piece {
@@ -283,10 +285,9 @@ fn get_mobility_score(pos: &Position, midgame: bool) -> i32 {
     let mut mobility_score = 0;
     let mut iterator = pos.color_bitboards[0];
     while !iterator.is_empty() {
-        let index = iterator.trailing_zeros() as usize;
-        let square = Square::index(index);
-        let mobility = get_mobility(pos, &square, mobility_range);
-        let piece = pos.piece_at(Square::index(index)).unwrap().0;
+        let index = iterator.trailing_zeros() as u8;
+        let mobility = get_mobility(pos, index, mobility_range);
+        let piece = pos.piece_at(index).unwrap().0;
         match piece {
             0 => {
                 if midgame {
@@ -324,34 +325,34 @@ fn get_mobility_score(pos: &Position, midgame: bool) -> i32 {
     mobility_score
 } 
 
-fn get_mobility(pos: &Position, square: &Square, mobility_range: BitBoard) -> u32 {
-    if let Some((piece, _color)) = pos.piece_at(*square) {
+fn get_mobility(pos: &Position, square: u8, mobility_range: BitBoard) -> u32 {
+    if let Some((piece, _color)) = pos.piece_at(square) {
         match piece {
             0 => {
                 let directions = &[(0, 1), (0, -1), (1, 0), (-1, 0)];
-                let blockers = movegen::get_first_actual_blockers(directions, *square, pos);
-                let mut moves = movegen::slider_moves(Square::index(*square as usize), blockers, directions);
+                let blockers = movegen::get_first_actual_blockers(directions, square, pos);
+                let mut moves = movegen::slider_moves(square, blockers, directions);
                 // Remove all squares that are not within our mobility range
                 moves &= mobility_range;
                 return moves.count_ones();
             },                    
             1 => {
-                let mut moves = movegen::get_pseudolegal_knight_moves(Square::index(*square as usize));
+                let mut moves = movegen::get_pseudolegal_knight_moves(square);
                 // Remove all squares that are not within our mobility range
                 moves &= mobility_range;
                 return moves.count_ones();
             },
             2 => {
                 let directions = &[(1, 1), (1, -1), (-1, 1), (-1, -1)];
-                let blockers = movegen::get_first_actual_blockers(directions, *square, pos);
-                let mut moves = movegen::slider_moves(Square::index(*square as usize), blockers, directions);
+                let blockers = movegen::get_first_actual_blockers(directions, square, pos);
+                let mut moves = movegen::slider_moves(square, blockers, directions);
                 moves &= mobility_range;
                 return moves.count_ones();
             },
             3 => {
                 let directions = &[(0, 1), (0, -1), (1, 0), (-1, 0), (1, 1), (1, -1), (-1, 1), (-1, -1)];
-                let blockers = movegen::get_first_actual_blockers(directions, *square, pos);
-                let mut moves = movegen::slider_moves(Square::index(*square as usize), blockers, directions);
+                let blockers = movegen::get_first_actual_blockers(directions, square, pos);
+                let mut moves = movegen::slider_moves(square, blockers, directions);
                 // Remove all squares that are not within our mobility range
                 moves &= mobility_range;
                 return moves.count_ones();
@@ -362,28 +363,28 @@ fn get_mobility(pos: &Position, square: &Square, mobility_range: BitBoard) -> u3
     0
 }
 
-fn is_in_mobility_area(pos: &Position, square: &Square) -> bool {
+fn is_in_mobility_area(pos: &Position, square: u8) -> bool {
     // If the target square is occupied by our own king or queen, return false
-    if pos.color_bitboards[0] & pos.piece_bitboards[4] & BitBoard::from_square(*square) != BitBoard::empty() {
+    if pos.color_bitboards[0] & pos.piece_bitboards[4] & BitBoard::from_square(square) != BitBoard::empty() {
         return false;
     }
-    if pos.color_bitboards[0] & pos.piece_bitboards[3] & BitBoard::from_square(*square) != BitBoard::empty() {
+    if pos.color_bitboards[0] & pos.piece_bitboards[3] & BitBoard::from_square(square) != BitBoard::empty() {
         return false;
     }
     // If the square is protected by an enemy pawn, return false
-    if let Some(offset_square) = square.try_offset(-1, 1) {
+    if let Some(offset_square) = try_square_offset(square, -1, 1) {
         if pos.color_bitboards[1] & pos.piece_bitboards[5] & BitBoard::from_square(offset_square) != BitBoard::empty() {
             return false;
         }
     }
-    if let Some(offset_square) = square.try_offset(1, 1) {
+    if let Some(offset_square) = try_square_offset(square, 1, 1) {
         if pos.color_bitboards[1] & pos.piece_bitboards[5] & BitBoard::from_square(offset_square) != BitBoard::empty() {
             return false;
         }
     }
     // If the square is on the 2nd or 3rd rank and is occupied by our own pawn, return false
-    if pos.color_bitboards[0] & pos.piece_bitboards[5] & BitBoard::from_square(*square) != BitBoard::empty() &&
-        *square as usize / 8 < 3 {
+    if pos.color_bitboards[0] & pos.piece_bitboards[5] & BitBoard::from_square(square) != BitBoard::empty() &&
+        square / 8 < 3 {
             return false;
     }
     // TODO: exclude blockers for king from the mobility area
@@ -397,10 +398,9 @@ fn get_mobility_range(pos: &Position) -> BitBoard {
     mobility_range ^= queen ^ king;
     let mut mobility_range_iterator = mobility_range;
     while !mobility_range_iterator.is_empty() {
-        let index = mobility_range_iterator.trailing_zeros() as usize;
-        let square = Square::index(index);
-        if !is_in_mobility_area(pos, &square) {
-            mobility_range &= !BitBoard::from_square(square);
+        let index = mobility_range_iterator.trailing_zeros() as u8;
+        if !is_in_mobility_area(pos, index) {
+            mobility_range &= !BitBoard::from_square(index);
         }
         mobility_range_iterator.clear_lsb();
     }

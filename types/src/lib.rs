@@ -1,9 +1,8 @@
 use std::ops::Not;
-
 pub mod bitboard;
 pub mod position;
 pub mod state;
-pub mod square;
+// pub mod square;
 
 /* Represents a single square on the board.
 / Representation: 0-63, with 0 being a1 and 63 being h8. */
@@ -32,7 +31,6 @@ impl Not for Color {
 }
 
 pub struct Results;
-
 impl Results {
     pub const ONGOING: u8 = 0b00010000;
     pub const DRAW: u8 = 0b00001000;
@@ -76,3 +74,22 @@ impl Castling {
     pub const BLACK_CASTLING: u8 = Self::BLACK_KING_SIDE | Self::BLACK_QUEEN_SIDE;
     pub const ANY_CASTLING: u8 = Self::WHITE_CASTLING | Self::BLACK_CASTLING;
 }
+
+pub mod types_utils {
+    pub fn try_square_offset(square: u8, dx: i8, dy: i8) -> Option<u8> {
+        let (file, rank) = (square % 8, square / 8);
+        let (new_file, new_rank) = (file as i8 + dx, rank as i8 + dy);
+        if new_file < 0 || new_file > 7 || new_rank < 0 || new_rank > 7 {
+            None
+        } else {
+            Some((new_rank * 8 + new_file) as u8)
+        }
+    }
+
+    pub fn string_from_square(square: u8) -> String {
+        let file = (square % 8) as u8 + 97;
+        let rank = (square / 8) as u8 + 49;
+        format!("{}{}", (file as char).to_ascii_uppercase(), (rank as char).to_ascii_uppercase())
+    }
+}
+    

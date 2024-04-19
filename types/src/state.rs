@@ -1,5 +1,4 @@
 use crate::{Color, Castling, Results};
-use crate::square::Square;
 use std::ops::Not;
 
 /* A state depicts additional information that is necessary to evaluate a position:
@@ -8,7 +7,7 @@ use std::ops::Not;
 #[derive(Debug, Clone, Copy, Hash, Eq, PartialEq)]
 pub struct State {
     pub castling_rights: CastlingRights,
-    pub en_passant_square: Option<Square>,
+    pub en_passant_square: Option<u8>,
     pub half_move_counter: u8,
     pub active_player: Color,
     pub game_result: GameResult,

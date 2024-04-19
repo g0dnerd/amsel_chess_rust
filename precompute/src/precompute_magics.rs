@@ -1,10 +1,12 @@
 use crate::rng::Rng;
 use types::bitboard::BitBoard;
-use types::square::Square;
+use types::types_utils::*;
 use std::fs::File;
 use std::io;
-use std::io::prelude::*;
-use std::io::Error;
+use std::io::{
+    prelude::*,
+    Error,
+};
 
 /* This module contains the logic to precompute a magic number for a given slider piece and square
 / that perfectly maps input blockers into a hash table.
@@ -19,7 +21,7 @@ pub struct SlidingPiece {
 
 impl SlidingPiece {
     // Returns a bitboard of all possible moves for a slider piece considering blockers.
-    fn moves(&self, square: Square, blockers: BitBoard) -> BitBoard {
+    fn moves(&self, square: u8, blockers: BitBoard) -> BitBoard {
         let mut moves = BitBoard::empty();
         for &(dx, dy) in &self.directions {
             let mut ray = square;
@@ -30,7 +32,7 @@ impl SlidingPiece {
             /  3. Loop terminates if that new square is in the list of blockers.
             /  4. If not, square gets added to legal moves. */
             while !blockers.contains(ray) {
-                if let Some(offset_by_delta) = ray.try_offset(dx, dy) {
+                if let Some(offset_by_delta) = try_square_offset(ray, dx, dy) {
                     ray = offset_by_delta;
                     moves |= BitBoard::from_square(ray);
                 } else {
@@ -43,7 +45,7 @@ impl SlidingPiece {
 
     /* Returns a bitboard of all potential squares that block the slider piece.
     / This later gets used as a mask to map the blocker squares to a hash table. */
-    fn blocker_squares(&self, square: Square) -> BitBoard {
+    fn blocker_squares(&self, square: u8) -> BitBoard {
         let mut blockers = BitBoard::empty();
 
         /* Similar procedure as above:
@@ -53,7 +55,7 @@ impl SlidingPiece {
         /  4. XOR square and the blocker BitBoard together. */
         for &(dx, dy) in &self.directions {
             let mut ray = square;
-            while let Some(offset_by_delta) = ray.try_offset(dx, dy) {
+            while let Some(offset_by_delta) = try_square_offset(ray, dx, dy) {
                 blockers |= BitBoard::from_square(ray);
                 ray = offset_by_delta;
             }
@@ -96,7 +98,7 @@ fn magic_index(entry: &MagicEntry, blockers: BitBoard) -> usize {
 // Returns a magic number for a given slider piece and square.
 fn compute_magic(
     sliding_piece: &SlidingPiece,
-    square: Square,
+    square: u8,
     shift_amount: u8,
     rng_instance: &mut Rng
 ) -> (MagicEntry, Vec<BitBoard>) {
@@ -131,7 +133,7 @@ struct TableFillError;
 
 fn attempt_magics(
     sliding_piece: &SlidingPiece,
-    square: Square,
+    square: u8,
     entry: &MagicEntry
 ) -> Result<Vec<BitBoard>, TableFillError> {
 
@@ -176,8 +178,6 @@ pub fn precompute_magics(
         println!("Precomputing magics in path {}", path);
         std::fs::remove_file(path).ok();
         let mut output_file = File::create(path)?;
-        let line = "use types::square::Square;\n";
-        write!(output_file, "{}\n", line)?;
         let line = "pub struct MagicTableEntry {
             pub mask: u64,
             pub magic: u64,
@@ -189,12 +189,12 @@ pub fn precompute_magics(
             let piece_name = if sliding_piece == &ROOK { "rook" } else { "bishop" };
             println!("\nComputing magics for {}", piece_name);
             let line = format!(
-                "pub const {}_MAGICS: &[MagicEntry; Square::NUM] = &[",
+                "pub const {}_MAGICS: &[MagicEntry; 64] = &[",
                 piece_name.to_uppercase()
             );
             write!(output_file, "{}\n", line)?;
             let mut table_length = 0;
-            for square in Square::ALL {
+            for square in 0..64 {
                 let blockers_amount = sliding_piece.blocker_squares(square).count_ones() as u8;
                 let (magic_entry, magics) = compute_magic(sliding_piece, square, blockers_amount, rng_instance);
 

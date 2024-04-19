@@ -5,7 +5,7 @@ pub mod evaluation;
 pub mod negamax;
 
 pub mod parse_input {
-    pub fn user_input_to_square_index(input: &str) -> Result<[usize; 2], String> {
+    pub fn user_input_to_square_index(input: &str) -> Result<[u8; 2], String> {
         if input == "" {
             return Ok([97, 97]);
         }
