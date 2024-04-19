@@ -4,7 +4,8 @@
 This is a rust port of my unfinished amselChess engine, originally written in python.  
 This workspace contains two library crates (precompute, types) and two binary crates (engine and precompute).  
 You can specify the binary to run by using `cargo run --bin binary-name`  
-Compute and save magic bitboards by running `cargo build --bin precompute`
+Compute and save magic bitboards by running `cargo build --bin precompute`  
+View available arguments by typing `cargo run --bin engine -- help`
 
 ## Features
 * uses bitboards to represent boardstates to make evaluation ops cheaper
@@ -12,10 +13,13 @@ Compute and save magic bitboards by running `cargo build --bin precompute`
 * dynamic attacker storage to reduce computation time each time legal moves are generated
 
 ## ToDos
-* remove the second binary crate and move the precomputation work to `cargo build` for the main binary
-* add en passant
+* solve attack mapping synchronization
 * refactor square class to a simple index
+* move game loop out of main completely, move inside methods
+* join player & engine move making
+* add en passant
 * add lower/upper bound flags to transposition table entries
+* remove the second binary crate and move the precomputation work to `cargo build` for the main binary
 
 ### Done
 * dynamic storage of slider paths & attacks to further increase performance
