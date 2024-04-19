@@ -165,4 +165,5 @@ impl BitBoard {
     pub fn clear_lsb(&mut self) {
         self.0 &= self.0 - 1;
     }
+
 } 

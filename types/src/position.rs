@@ -279,7 +279,6 @@ impl Position {
     }
 
     pub fn make_castling_move(&mut self, from: &Square, to: &Square) {
-        println!("Castling move from {:?} to {:?}", from, to);
         let (piece, color) = self.piece_at(*from).unwrap();
         let piece_index = match piece {
             Piece::ROOK => 0,
@@ -377,44 +376,8 @@ impl Position {
     }
  */
 
-    pub fn is_attacked_by_black(&mut self, square: Square) -> bool {
-        self.sync_attack_maps();
-        self.attacked_by_black.contains(square)
-    }
-
-    pub fn is_attacked_by_white(&mut self, square: Square) -> bool {
-        self.sync_attack_maps();
-        self.attacked_by_white.contains(square)
-    }
-
     pub fn update_attack_maps(&mut self, attacker_square: Square, attacks: BitBoard) {
         self.attack_bitboards[attacker_square as usize] = attacks;
-    }
-
-    fn sync_attack_maps(&mut self) {
-        let mut attacked_by_white = BitBoard::empty();
-        let mut attacked_by_black = BitBoard::empty();
-    
-        for i in 0..64 {
-            let attacker_bitboard = self.attack_bitboards[i];
-            let attacker_color_bitboard = self.color_bitboards[0];
-    
-            // Check if the attacker bitboard is non-empty
-            if !attacker_bitboard.is_empty() {
-                // Update the attacked_by_white if the attacker color is white
-                if attacker_color_bitboard.contains(Square::index(i)) {
-                    attacked_by_white |= attacker_bitboard;
-                } 
-                // Otherwise, update the attacked_by_black
-                else {
-                    attacked_by_black |= attacker_bitboard;
-                }
-            }
-        }
-    
-        // Update the class members directly
-        self.attacked_by_white = attacked_by_white;
-        self.attacked_by_black = attacked_by_black;
     }
 
     /* Returns true if the given square is under attack by the given color.
@@ -433,21 +396,15 @@ impl Position {
         false
     }
 
-    pub fn is_square_attacked_by_slider(&self, square: Square) -> BitBoard {
-        let mut affected = BitBoard::empty();
+    // Only to be used for debugging purposes
+    pub fn all_attacked_squares(&self, color: Color) -> BitBoard {
+        let mut attacked_squares = BitBoard::empty();
         for i in 0..64 {
-            if self.attack_bitboards[i].contains(square) {
-                if let Some(piece) = self.piece_at(Square::index(i)) {
-                    match piece.0 {
-                        0 => affected |= BitBoard::from_square(Square::index(i)),
-                        2 => affected |= BitBoard::from_square(Square::index(i)),
-                        3 => affected |= BitBoard::from_square(Square::index(i)),
-                        _ => (),
-                    }
-                }
+            if self.color_bitboards[color as usize].contains(Square::index(i)) {
+                attacked_squares |= self.attack_bitboards[i];
             }
         }
-        affected
+        attacked_squares
     }
 
     pub fn is_promotion(&self, start: &Square, end: &Square) -> bool {

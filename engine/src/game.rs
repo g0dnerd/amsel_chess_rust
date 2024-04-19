@@ -1,11 +1,121 @@
 use std::panic;
 
-use types::position::Position;
-use types::Color;
-use types::bitboard::BitBoard;
-use types::square::*;
-use crate::negamax;
-use crate::movegen;
+use types::{
+    position::Position,
+    bitboard::BitBoard,
+    square::*,
+    Color,
+};
+use crate::{
+    negamax,
+    movegen,
+    evaluation,
+    parse_input,
+};
+
+pub fn main_game_loop(humans: u8, depth: u8) {
+    let mut pos = Position::new();
+    match humans {
+        0 => {
+            println!("AI vs AI game.");
+            while pos.state.game_result.is_ongoing() {
+                pos.print_position();
+                let eval = evaluation::main_evaluation(&mut pos);
+                if eval == i32::MIN + 1 || eval == i32::MAX - 1 {
+                    println!("Current evaluation: - (game over)");
+                } else {
+                    match pos.state.active_player {
+                        Color::White => println!("Current evaluation: {}", eval),
+                        Color::Black => println!("Current evaluation: {}", -eval),
+                    
+                    }
+                }
+                if is_in_checkmate(&mut pos) {
+                    match pos.state.active_player {
+                        types::Color::White => {
+                            println!("Black wins by checkmate!");
+                            pos.state.game_result = types::state::GameResult(types::Results::BLACK_VICTORY);
+                            continue;
+                        },
+                        types::Color::Black => {
+                            println!("White wins by checkmate!");
+                            pos.state.game_result = types::state::GameResult(types::Results::WHITE_VICTORY);
+                            continue;
+                        }
+                    }
+                }
+                make_engine_move(&mut pos, depth);
+            }
+        },
+        1 => {
+            println!("Human vs AI game.");
+            while pos.state.game_result.is_ongoing() {
+                pos.print_position();
+                let eval = evaluation::main_evaluation(&mut pos);
+                if eval == i32::MIN + 1 || eval == i32::MAX - 1 {
+                    println!("Current evaluation: - (game over)");
+                } else {
+                    match pos.state.active_player {
+                        Color::White => println!("Current evaluation: {}", eval),
+                        Color::Black => println!("Current evaluation: {}", -eval),
+                    
+                    }
+                }
+                if is_in_checkmate(&mut pos) {
+                    match pos.state.active_player {
+                        types::Color::White => {
+                            println!("Black wins by checkmate!");
+                            pos.state.game_result = types::state::GameResult(types::Results::BLACK_VICTORY);
+                            continue;
+                        },
+                        types::Color::Black => {
+                            println!("White wins by checkmate!");
+                            pos.state.game_result = types::state::GameResult(types::Results::WHITE_VICTORY);
+                            continue;
+                        }
+                    }
+                }
+                // Get user input in the format of "a1 a2"
+                let mut input = String::new();
+                println!("Enter a legal move, type 'legal' to get a list of legal moves or press enter to have the engine move.");
+                std::io::stdin().read_line(&mut input).unwrap();
+                let input = input.trim();let input_legality = parse_input::user_input_to_square_index(input);
+                match input_legality {
+                    Ok(o) => {
+                        if o == [99, 99] {
+                            continue;
+                        } else if o == [98, 98] {
+                                println!("Legal moves: {:?}",
+                                    movegen::get_all_legal_moves_for_color(pos.state.active_player, &mut pos));
+                                continue;
+                        }
+                        else if o == [97, 97] {
+                            make_engine_move(&mut pos, depth);
+                            continue;
+                        }
+                    }
+                    Err(e) => {
+                        println!("Error: {}", e);
+                        continue;
+                    }
+                }
+
+                let squares = input_legality.unwrap();
+                let square = Square::index(squares[0]);
+                let target_square = Square::index(squares[1]);
+                
+                match make_player_move(&mut pos, square, target_square) {
+                    Ok(_) => (),
+                    Err(e) => {
+                        println!("Error: {}", e);
+                        continue;
+                    }
+                }
+            }
+        },
+        _ => panic!("Invalid number of human players."),
+    }
+}
 
 /* Find all sliders that are attacking the given square by using a fictitious queen that can move in all directions,
 getting all possible moves for that piece and then filtering out the sliders from the resulting bitboard. */
@@ -19,61 +129,39 @@ pub fn get_attacking_sliders(pos: &mut Position, from: Square) -> BitBoard {
 }
 
 pub fn update_attackers(pos: &mut Position, attackers: BitBoard) {
-    /* println!("Update attackers looking at move history {:?}", pos.move_history);
-    println!("Updating attackers on {:?}", attackers.squares_from_bb()); */
     let mut attacker_board = attackers;
+
+    // Remove any unoccupied squares from the list of attackers
+    attacker_board &= pos.color_bitboards[0] | pos.color_bitboards[1];
+
     while attacker_board != BitBoard::empty() {
         let index = attacker_board.trailing_zeros() as usize;
         let attacker_square = Square::index(index);
-        if let Some((piece, color)) = pos.piece_at(attacker_square) {
+        if let Some((piece, _color)) = pos.piece_at(attacker_square) {
             match piece {
                 0 => {
                     let attacks = movegen::get_rook_moves(attacker_square, pos);
-                    pos.attack_bitboards[attacker_square as usize] = attacks;
-                    match color {
-                        Color::White => pos.update_attack_maps(attacker_square, attacks),
-                        Color::Black => pos.update_attack_maps(attacker_square, attacks),
-                    }
+                    pos.update_attack_maps(attacker_square, attacks);
                 },
                 1 => {
                     let attacks = movegen::get_pseudolegal_knight_moves(attacker_square);
-                    pos.attack_bitboards[attacker_square as usize] = attacks;
-                    match color {
-                        Color::White => pos.update_attack_maps(attacker_square, attacks),
-                        Color::Black => pos.update_attack_maps(attacker_square, attacks),
-                    }
+                    pos.update_attack_maps(attacker_square, attacks);
                 },
                 2 => {
                     let attacks = movegen::get_bishop_moves(attacker_square, pos);
-                    pos.attack_bitboards[attacker_square as usize] = attacks;
-                    match color {
-                        Color::White => pos.update_attack_maps(attacker_square, attacks),
-                        Color::Black => pos.update_attack_maps(attacker_square, attacks),
-                    }
+                    pos.update_attack_maps(attacker_square, attacks);
                 },
                 3 => {
                     let attacks = movegen::get_queen_moves(attacker_square, pos);
-                    pos.attack_bitboards[attacker_square as usize] = attacks;
-                    match color {
-                        Color::White => pos.update_attack_maps(attacker_square, attacks),
-                        Color::Black => pos.update_attack_maps(attacker_square, attacks),
-                    }
+                    pos.update_attack_maps(attacker_square, attacks);
                 },
                 4 => {
                     let attacks = movegen::get_king_moves(attacker_square, pos);
-                    pos.attack_bitboards[attacker_square as usize] = attacks;
-                    match color {
-                        Color::White => pos.update_attack_maps(attacker_square, attacks),
-                        Color::Black => pos.update_attack_maps(attacker_square, attacks),
-                    }
+                    pos.update_attack_maps(attacker_square, attacks);
                 },
                 5 => {
                     let attacks = movegen::pawn_attacks(pos, attacker_square);
-                    pos.attack_bitboards[attacker_square as usize] = attacks;
-                    match color {
-                        Color::White => pos.update_attack_maps(attacker_square, attacks),
-                        Color::Black => pos.update_attack_maps(attacker_square, attacks),
-                    }
+                    pos.update_attack_maps(attacker_square, attacks);
                 },
                 _ => (),
             }
@@ -101,7 +189,7 @@ pub fn make_player_move(pos: &mut Position, from: Square, to: Square) -> Result<
         match pos.state.active_player {
             types::Color::White => {
                 let king_square = (pos.piece_bitboards[4] & pos.color_bitboards[0]).squares_from_bb()[0];
-                if pos.is_attacked_by_black(king_square) {
+                if pos.is_square_attacked_by_color(king_square, types::Color::Black) {
                     println!("Black wins by checkmate.");
                     pos.print_position();
                     pos.state.game_result = types::state::GameResult(types::Results::BLACK_VICTORY);
@@ -113,7 +201,7 @@ pub fn make_player_move(pos: &mut Position, from: Square, to: Square) -> Result<
             },
             types::Color::Black => {
                 let king_square = (pos.piece_bitboards[4] & pos.color_bitboards[1]).squares_from_bb()[0];
-                if pos.is_attacked_by_white(king_square) {
+                if pos.is_square_attacked_by_color(king_square, types::Color::White) {
                     println!("White wins by checkmate.");
                     pos.print_position();
                     pos.state.game_result = types::state::GameResult(types::Results::WHITE_VICTORY);
@@ -182,21 +270,21 @@ pub fn make_player_move(pos: &mut Position, from: Square, to: Square) -> Result<
     }
     
     attackers_to_update |= BitBoard::from_square(to);
+    println!("Make player move calling attacker update with attackers {:?}", attackers_to_update.squares_from_bb());
     update_attackers(pos, attackers_to_update);
 
     let king_square = match pos.state.active_player {
         Color::White => (pos.piece_bitboards[4] & pos.color_bitboards[0]).squares_from_bb()[0],
         Color::Black => (pos.piece_bitboards[4] & pos.color_bitboards[1]).squares_from_bb()[0],
     };
-    match pos.state.active_player {
-        Color::White => pos.check = pos.is_attacked_by_black(king_square),
-        Color::Black => pos.check = pos.is_attacked_by_white(king_square),
-    }
+    
+    // Check if the move puts the enemy king in check
+    pos.check = pos.is_square_attacked_by_color(king_square, !pos.state.active_player);
 
     Ok(())
 }
 
-pub fn make_engine_move(pos: &mut Position, depth: Option<u8>) {  
+pub fn make_engine_move(pos: &mut Position, depth: u8) {  
     let best_move = negamax::find_best_move(pos, depth);
     let (from, target_square) = best_move;
 
@@ -268,7 +356,7 @@ pub fn would_give_check(pos: &mut Position, from: &Square, to: &Square) -> bool 
             
             match king_square {
                 Ok(king_square) => {
-                    if new_pos.is_attacked_by_black(king_square) {
+                    if new_pos.is_square_attacked_by_color(king_square, Color::Black) {
                         return true;
                     }
                 },
@@ -283,7 +371,7 @@ pub fn would_give_check(pos: &mut Position, from: &Square, to: &Square) -> bool 
                 panic::catch_unwind(|| (new_pos.piece_bitboards[4] & new_pos.color_bitboards[1]).squares_from_bb()[0]);
             match king_square {
                 Ok(king_square) => {
-                    if new_pos.is_attacked_by_white(king_square) {
+                    if new_pos.is_square_attacked_by_color(king_square, Color::White) {
                         return true;
                     }
                 },
@@ -365,9 +453,8 @@ pub fn make_specific_engine_move(pos: &mut Position, from: Square, to: Square) {
         Color::White => (pos.piece_bitboards[4] & pos.color_bitboards[0]).squares_from_bb()[0],
         Color::Black => (pos.piece_bitboards[4] & pos.color_bitboards[1]).squares_from_bb()[0],
     };
-    match pos.state.active_player {
-        Color::White => pos.check = pos.is_attacked_by_black(king_square),
-        Color::Black => pos.check = pos.is_attacked_by_white(king_square),
-    }
+
+    // Check if the move puts the enemy king in check
+    pos.check = pos.is_square_attacked_by_color(king_square, !pos.state.active_player);
 
 }

@@ -18,8 +18,6 @@ use precompute::rng;
 const NUM_PIECE_TYPES: usize = 12;
 const NUM_SQUARES: usize = 64;
 
-static MAX_DEPTH: u8 = 6;
-
 // Define the Zobrist keys as a global variable
 lazy_static! {
     static ref ZOBRIST_KEYS: [[u64; NUM_SQUARES]; NUM_PIECE_TYPES] = initialize_zobrist_keys();
@@ -198,12 +196,10 @@ fn negamax(pos: &mut Position, params: &mut SearchParameters) -> i32 {
 
 }
 
-pub fn find_best_move(pos: &mut Position, depth: Option<u8>) -> (Square, Square) {
+pub fn find_best_move(pos: &mut Position, depth: u8) -> (Square, Square) {
     let start_time = Instant::now();
 
     MATE_IN_ONE_FOUND.store(false, std::sync::atomic::Ordering::Relaxed);
-
-    let depth = depth.unwrap_or(MAX_DEPTH);
 
     println!("Running search at depth {} with {} threads", depth, rayon::current_num_threads());
     

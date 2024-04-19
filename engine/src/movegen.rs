@@ -335,26 +335,28 @@ pub fn get_all_legal_moves_for_color(color: Color, pos: &mut Position) -> Vec<(S
         // Remove the move if it would castle through check
         if pos.piece_at(*from).unwrap().0 == 4 {
             if *from == Square::E1 && *to == Square::G1 {
-                if pos.is_attacked_by_black(Square::F1) || pos.is_attacked_by_black(Square::G1) {
+                if pos.is_square_attacked_by_color(Square::F1, Color::Black) ||
+                        pos.is_square_attacked_by_color(Square::G1, Color::Black) {
                     moves_to_remove.push((*from, *to));
                     continue;
                 }
             } else if *from == Square::E1 && *to == Square::B1 {
-                if pos.is_attacked_by_black(Square::D1) ||
-                        pos.is_attacked_by_black(Square::C1) ||
-                        pos.is_attacked_by_black(Square::B1) {
+                if pos.is_square_attacked_by_color(Square::D1, Color::Black) ||
+                        pos.is_square_attacked_by_color(Square::C1, Color::Black) ||
+                        pos.is_square_attacked_by_color(Square::B1, Color::Black) {
                     moves_to_remove.push((*from, *to));
                     continue;
                 }
             } else if *from == Square::E8 && *to == Square::G8 {
-                if pos.is_attacked_by_white(Square::F8) || pos.is_attacked_by_white(Square::G8) {
+                if pos.is_square_attacked_by_color(Square::F8, Color::White) ||
+                        pos.is_square_attacked_by_color(Square::G8, Color::White) {
                     moves_to_remove.push((*from, *to));
                     continue;
                 }
             } else if *from == Square::E8 && *to == Square::B8 {
-                if pos.is_attacked_by_white(Square::D8) ||
-                        pos.is_attacked_by_white(Square::C8) ||
-                        pos.is_attacked_by_white(Square::B8) {
+                if pos.is_square_attacked_by_color(Square::D8, Color::White) ||
+                        pos.is_square_attacked_by_color(Square::C8, Color::White) ||
+                        pos.is_square_attacked_by_color(Square::B8, Color::White) {
                     moves_to_remove.push((*from, *to));
                     continue;
                 }
@@ -418,14 +420,14 @@ pub fn get_all_legal_moves_for_color(color: Color, pos: &mut Position) -> Vec<(S
         match color {
             Color::White => {
                 let king_square = (new_pos.piece_bitboards[4] & new_pos.color_bitboards[0]).squares_from_bb()[0];
-                if new_pos.is_attacked_by_black(king_square) {
+                if new_pos.is_square_attacked_by_color(king_square, Color::Black) {
                     moves_to_remove.push((*from, *to));
                     continue;
                 }
             },
             Color::Black => {
                 let king_square = (new_pos.piece_bitboards[4] & new_pos.color_bitboards[1]).squares_from_bb()[0];
-                if new_pos.is_attacked_by_white(king_square) {
+                if new_pos.is_square_attacked_by_color(king_square, Color::White) {
                     moves_to_remove.push((*from, *to));
                     continue;
                 }
@@ -488,14 +490,14 @@ fn get_legal_moves_from_check(color: Color, pos: &mut Position) -> Vec<(Square, 
         match color {
             Color::White => {
                 let king_square = (new_pos.piece_bitboards[4] & new_pos.color_bitboards[0]).squares_from_bb()[0];
-                if new_pos.is_attacked_by_black(king_square) {
+                if new_pos.is_square_attacked_by_color(king_square, Color::Black) {
                     moves_to_remove.push((*from, *to));
                     continue;
                 }
             },
             Color::Black => {
                 let king_square = (new_pos.piece_bitboards[4] & new_pos.color_bitboards[1]).squares_from_bb()[0];
-                if new_pos.is_attacked_by_white(king_square) {
+                if new_pos.is_square_attacked_by_color(king_square, Color::White) {
                     moves_to_remove.push((*from, *to));
                     continue;
                 }
