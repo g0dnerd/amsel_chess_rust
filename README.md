@@ -12,8 +12,8 @@ Compute and save magic bitboards by running `cargo build --bin precompute`
 * dynamic attacker storage to reduce computation time each time legal moves are generated
 
 ## ToDos
-* add en passant
-* add lower/upper bound flags to transposition table entries
+* add more complexity to end game evaluation
+* gui
 * remove the second binary crate and move the precomputation work to `cargo build` for the main binary
 
 ### Done
@@ -24,5 +24,7 @@ Compute and save magic bitboards by running `cargo build --bin precompute`
 * fixed illegal move removal while in check
 * switch to rayon for multithreading
 * add transposition tables to search module
+* add en passant
+* add lower/upper bound flags to transposition table entries
 
 ## Known issues

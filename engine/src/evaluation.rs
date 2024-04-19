@@ -4,8 +4,10 @@ use types::{
     bitboard::BitBoard,
     types_utils::*,
 };
-use crate::movegen;
-use crate::game;
+use crate::{
+    movegen,
+    game,
+};
 
 const PIECE_SQUARE_TABLES_MIDGAME: [[[i32; 8]; 4]; 5] = [
     // ROOKS
@@ -237,10 +239,7 @@ fn get_midgame_evaluation(pos: &mut Position) -> i32 {
     let pos_flipped = pos.colorflip();
     evaluation_score += get_piece_value_midgame(pos) as i32 - get_piece_value_midgame(&pos_flipped) as i32;
     evaluation_score += get_piece_square_table_value_midgame(pos) - get_piece_square_table_value_midgame(&pos_flipped);
-    let white_mobility = get_mobility_score(pos, true) as i32;
-    let black_mobility = get_mobility_score(&pos_flipped, true) as i32;
-    evaluation_score += white_mobility - black_mobility;
-    // evaluation_score += get_mobility_score(pos, true) as i32 - get_mobility_score(&pos_flipped, true) as i32;
+    evaluation_score += get_mobility_score(pos, true) as i32 - get_mobility_score(&pos_flipped, true) as i32;
     // TODO: pawn structure: isolated, backward, doubled, connected, chained, etc.
     // TODO: piece safety
     // TODO: passed pawns

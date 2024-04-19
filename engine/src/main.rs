@@ -4,7 +4,7 @@ use types::types_utils::string_from_square;
 
 fn main() {
     env::set_var("RUST_BACKTRACE", "1");
-    env::set_var("RAYON_NUM_THREADS", "5");
+    env::set_var("RAYON_NUM_THREADS", "12");
 
     // Get game settings from user
     let mut input_human_players = String::new();

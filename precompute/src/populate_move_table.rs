@@ -3,7 +3,6 @@ use types::{
     bitboard::BitBoard,
     types_utils::*,
 };
-
 use crate::magics::*;
 
 

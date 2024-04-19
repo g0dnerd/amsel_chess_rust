@@ -1,11 +1,15 @@
 use crate::rng::Rng;
-use types::bitboard::BitBoard;
-use types::types_utils::*;
-use std::fs::File;
-use std::io;
-use std::io::{
-    prelude::*,
-    Error,
+use types::{
+    bitboard::BitBoard,
+    types_utils::*,
+};
+use std::{
+    io::{
+        self,
+        prelude::*,
+        Error,
+    },
+    fs::File,
 };
 
 /* This module contains the logic to precompute a magic number for a given slider piece and square

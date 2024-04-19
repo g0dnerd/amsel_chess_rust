@@ -1,15 +1,19 @@
-use precompute::populate_move_table::{make_table, write_magics, write_table};
-use precompute::precompute_magics::precompute_magics;
-use precompute::rng::Rng;
-use std::io::Result;
-use std::io::prelude::*;
-use std::env;
-
-use std::fs::File;
-use std::io::BufWriter;
-use std::path::PathBuf;
-
-use precompute::magics::*;
+use precompute::{
+    populate_move_table::{make_table, write_magics, write_table},
+    precompute_magics::precompute_magics,
+    rng::Rng,
+    magics::*,
+};
+use std::{
+    io::{
+        Result,
+        BufWriter,
+        prelude::*,
+    },
+    fs::File,
+    path::PathBuf,
+    env,
+};
 
 fn main() -> Result<()> {
 

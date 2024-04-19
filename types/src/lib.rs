@@ -2,7 +2,6 @@ use std::ops::Not;
 pub mod bitboard;
 pub mod position;
 pub mod state;
-// pub mod square;
 
 /* Represents a single square on the board.
 / Representation: 0-63, with 0 being a1 and 63 being h8. */

@@ -35,10 +35,19 @@ lazy_static! {
     static ref MATE_IN_ONE_FOUND: AtomicBool = AtomicBool::new(false);
 }
 
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+enum Flag {
+    Exact,
+    LowerBound,
+    UpperBound,
+}
+
 #[derive(Debug, Copy, Clone)]
 struct TranspositionEntry {
     depth: u8,
     score: i32,
+    flag: Flag,
+    validity: bool,
 }
 
 struct SearchResult {
@@ -61,7 +70,6 @@ fn initialize_zobrist_keys() -> [[u64; NUM_SQUARES]; NUM_PIECE_TYPES] {
     for piece_type in 0..NUM_PIECE_TYPES {
         for square in 0..NUM_SQUARES {
             let key = rng_instance.next_u64();
-            // println!("Generated key: {} for piece type {} and square {}", key, piece_type, square);
             if dupe_keys.contains(&key) {
                 panic!("Duplicate key generated: {}", key);
             }
@@ -69,7 +77,6 @@ fn initialize_zobrist_keys() -> [[u64; NUM_SQUARES]; NUM_PIECE_TYPES] {
             keys[piece_type][square] = key;
         }
     }
-    // println!("Successfully initialized Zobrist keys.");
     keys
 }
 
@@ -80,18 +87,14 @@ fn calculate_hash(pos: &Position) -> u64 {
             hash ^= ZOBRIST_KEYS[piece as usize][square];
         }
     }
-    // println!("Calculated hash: {}", hash);
     hash
 }
 
 // Function to get a position's entry from the transposition table
 fn get_entry(hash: u64) -> Option<TranspositionEntry> {
-    // println!("Attempting to get entry for hash {} from transposition table.", hash);
     match TRANSPOSITION_TABLE.lock() {
         Ok(table) => {
-            // println!("Acquired lock on transposition table at line {}, getting entry.", line!());
             let entry = table.get(&hash).cloned();
-            // println!("Released lock on transposition table at line {}.", line!());
             entry
         },
         Err(e) => {
@@ -103,10 +106,8 @@ fn get_entry(hash: u64) -> Option<TranspositionEntry> {
 
 // Function to store a position's entry in the transposition table
 fn store_entry(hash: u64, entry: TranspositionEntry) {
-    // println!("Attempting to store entry for hash {} in transposition table.", hash);
     match TRANSPOSITION_TABLE.lock() {
         Ok(mut table) => {
-            // println!("Acquired lock on transposition table, storing entry.");
             // Check for hash collision
             if let Some(old_entry) = table.get(&hash) {
                 if entry.depth > old_entry.depth {
@@ -118,7 +119,6 @@ fn store_entry(hash: u64, entry: TranspositionEntry) {
             } else {
                 table.insert(hash, entry);
             }
-            // println!("Released lock on transposition table.");
         },
         Err(_) => {
             println!("Error acquiring lock on transposition table while storing entry.");
@@ -141,25 +141,31 @@ fn order_moves(mut moves: Vec<(u8, u8)>, pos: &mut Position) -> Vec<(u8, u8)> {
 }
 
 fn negamax(pos: &mut Position, params: &mut SearchParameters) -> i32 {
-    
-    // println!("Negamax called for line {:?}", pos.move_history);
 
     // If the position has already been evaluated to the desired depth, return the stored score
     let hash = calculate_hash(pos);
 
+    let mut alpha = params.alpha;
+    let mut beta = params.beta;
+
     if let Some(entry) = get_entry(hash) {
-        if entry.depth >= params.depth {
-            return entry.score;
+        if entry.validity && entry.depth >= params.depth {
+            if entry.flag == Flag::Exact {
+                return entry.score;
+            } else if entry.flag == Flag::LowerBound {
+                alpha = cmp::max(alpha, entry.score);
+            } else if entry.flag == Flag::UpperBound {
+                beta = cmp::min(beta, entry.score);
+            }
+            if alpha >= beta {
+                return entry.score;
+            }
         }
     } 
 
-    if MATE_IN_ONE_FOUND.load(std::sync::atomic::Ordering::Relaxed) {
-        return i32::MIN;
-    }
+    if MATE_IN_ONE_FOUND.load(std::sync::atomic::Ordering::Relaxed) { return i32::MIN; }
 
-    if params.depth == 0 || !pos.state.game_result.is_ongoing() {
-        return evaluation::main_evaluation(pos);
-    }
+    if params.depth == 0 || !pos.state.game_result.is_ongoing() { return evaluation::main_evaluation(pos); }
 
     // Retrieve and order all legal moves
     let mut legal_moves =
@@ -167,7 +173,6 @@ fn negamax(pos: &mut Position, params: &mut SearchParameters) -> i32 {
     legal_moves = order_moves(legal_moves, pos);
 
     let mut score = i32::MIN + 1;
-    let mut alpha = params.alpha;
 
     // Iterate over all legal moves
     for (from, to) in legal_moves.iter() {
@@ -175,24 +180,35 @@ fn negamax(pos: &mut Position, params: &mut SearchParameters) -> i32 {
         game::apply_move(&mut new_pos, *from, *to);
 
         score = cmp::max(score, -negamax(&mut new_pos, &mut SearchParameters {
-            alpha: -params.beta,
+            alpha: -beta,
             beta: -alpha,
             depth: params.depth - 1,
         }));
-        
-        store_entry(hash, TranspositionEntry {
-            depth: params.depth,
-            score,
-        });
 
         alpha = cmp::max(alpha, score);
 
         // Beta-cutoff
-        if alpha >= params.beta {
+        if alpha >= beta {
             break;
         }
-
     }
+
+    let flag = if score <= params.alpha {
+        Flag::UpperBound
+    } else if score >= beta {
+        Flag::LowerBound
+    } else {
+        Flag::Exact
+    };
+    let validity = true;
+
+    store_entry(hash, TranspositionEntry {
+        depth: params.depth,
+        score,
+        flag,
+        validity,
+    });
+
     // Return the best score found (or the cutoff if no improvement was made)
     score
 

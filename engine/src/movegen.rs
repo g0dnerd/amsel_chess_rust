@@ -1,8 +1,11 @@
-// use std::collections::HashMap;
-use crate::magics::*;
-use crate::game;
-use precompute::magics::MagicTableEntry;
-use precompute::precompute_magics::{BISHOP, ROOK};
+use crate::{
+    magics::*,
+    game
+};
+use precompute::{
+    magics::MagicTableEntry,
+    precompute_magics::{BISHOP, ROOK},
+};
 use types::{
     bitboard::BitBoard,
     position::Position,

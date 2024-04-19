@@ -1,8 +1,13 @@
-use crate::bitboard::BitBoard;
-use crate::types_utils::string_from_square;
-use crate::{Color, Castling, Results, get_piece_representation};
-use crate::state::{State, GameResult, /* CastlingRights */};
-use crate::Piece;
+use crate::{
+    state::{State, GameResult},
+    bitboard::BitBoard,
+    types_utils::string_from_square,
+    Color,
+    Castling,
+    Results,
+    Piece,
+    get_piece_representation,
+};
 
 /* A position contains the minimum amount of information necessary
 / for the engine to calculate moves and evaluate the board state. */ 

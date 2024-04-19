@@ -3,10 +3,10 @@ use std::panic;
 use types::{
     position::Position,
     bitboard::BitBoard,
-    Color,
     state::GameResult,
-    Results,
     types_utils::*,
+    Color,
+    Results,
 };
 use crate::{
     negamax,
