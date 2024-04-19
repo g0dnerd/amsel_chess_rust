@@ -282,7 +282,7 @@ pub fn apply_move(pos: &mut Position, from: u8, to: u8) {
                         Color::Black => to - 8,
                     };
                     attackers_to_update |= get_attacking_sliders(pos, ep_target);
-                    pos.color_bitboards[!pos.state.active_player as usize] ^= BitBoard::from_square(ep_target);
+                    pos.color_bitboards[pos.state.active_player as usize] ^= BitBoard::from_square(ep_target);
                     pos.piece_bitboards[5] ^= BitBoard::from_square(ep_target);
                 }
             },
