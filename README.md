@@ -15,7 +15,7 @@ Compute and save magic bitboards by running `cargo build --bin precompute`
 ### Search
 * do we want to store a PV (also aids move ordering)
 * expand move ordering
-* quiesce search
+* quiescence search
 ### Evaluation
 * different eval for check
 * add more complexity to end game evaluation

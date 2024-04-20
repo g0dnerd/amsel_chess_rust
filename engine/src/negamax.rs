@@ -11,9 +11,7 @@ use rand::seq::SliceRandom;
 use lazy_static::lazy_static;
 use indicatif::{ProgressBar, ProgressStyle};
 use crate::{
-    movegen,
-    game,
-    evaluation,
+    evaluation, game, movegen
 };
 use types::position::Position;
 use precompute::rng;
@@ -165,7 +163,16 @@ fn negamax(pos: &mut Position, params: &mut SearchParameters) -> i32 {
 
     if MATE_IN_ONE_FOUND.load(std::sync::atomic::Ordering::Relaxed) { return i32::MIN; }
 
-    if params.depth == 0 || !pos.state.game_result.is_ongoing() { return evaluation::main_evaluation(pos); }
+    // If we have reached a terminal node (game result), return the evaluation
+    if game::is_in_checkmate(pos) {
+        return i32::MIN;
+    } else if params.depth == 0 {
+        if game::is_quiet_position(pos) {
+            return evaluation::main_evaluation(pos);
+        } else {
+            return quiescence_search(pos, alpha, beta);
+        }
+    }
 
     // Retrieve and order all legal moves
     let mut legal_moves =
@@ -212,6 +219,37 @@ fn negamax(pos: &mut Position, params: &mut SearchParameters) -> i32 {
     // Return the best score found (or the cutoff if no improvement was made)
     score
 
+}
+
+fn quiescence_search(pos: &mut Position, mut alpha: i32, beta: i32) -> i32 {
+    let stand_pat = evaluation::main_evaluation(pos);
+    if stand_pat >= beta {
+        return beta;
+    }
+    if alpha < stand_pat {
+        alpha = stand_pat;
+    }
+
+    // Delta pruning - get the highest possible score swing for any move. If it's less than the current alpha, return alpha.
+    let delta = 1400;
+    if stand_pat < alpha - delta { 
+        // println!("Delta pruning during quiescence search.");
+        return alpha;
+    }
+
+    let all_captures = movegen::get_all_captures_for_color(pos.state.active_player, pos);
+    for (from, to) in all_captures {
+        let mut new_pos = pos.clone();
+        game::apply_move(&mut new_pos, from, to);
+        let score = -quiescence_search(&mut new_pos, -beta, -alpha);
+        if score >= beta {
+            return beta;
+        }
+        if score > alpha {
+            alpha = score;
+        }
+    }
+    alpha
 }
 
 pub fn find_best_move(pos: &mut Position, depth: u8) -> (u8, u8) {

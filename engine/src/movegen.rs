@@ -525,3 +525,9 @@ fn get_legal_moves_from_check(color: Color, pos: &mut Position) -> Vec<(u8, u8)>
     moves.retain(|&x| !moves_to_remove.contains(&x));
     moves
 }
+
+pub fn get_all_captures_for_color(color: Color, pos: &mut Position) -> Vec<(u8, u8)> {
+    let mut moves = get_all_legal_moves_for_color(color, pos);
+    moves.retain(|&(_from, to)| pos.is_capture(&to));
+    moves
+}

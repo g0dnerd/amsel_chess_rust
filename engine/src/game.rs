@@ -255,7 +255,6 @@ pub fn apply_move(pos: &mut Position, from: u8, to: u8) {
             pos.make_castling_move(&(to + 1), &(from + 1));
             attackers_to_update |= BitBoard::from_square(from + 1);
             attackers_to_update ^= BitBoard::from_square(to + 1);
-        
         }
     }
 
@@ -304,6 +303,14 @@ pub fn apply_move(pos: &mut Position, from: u8, to: u8) {
             // Check if the move puts the enemy king in check
             pos.check = pos.is_square_attacked_by_color(king_square.trailing_zeros() as u8, !pos.state.active_player),
     }
+}
 
-
+pub fn is_quiet_position(pos: &mut Position) -> bool {
+    let legal_moves = movegen::get_all_legal_moves_for_color(pos.state.active_player, pos);
+    for (_from, to) in legal_moves {
+        if pos.is_capture(&to) {
+            return false;
+        }
+    }
+    true
 }
