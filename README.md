@@ -12,7 +12,15 @@ Compute and save magic bitboards by running `cargo build --bin precompute`
 * dynamic attacker storage to reduce computation time each time legal moves are generated
 
 ## ToDos
+### Search
+* do we want to store a PV (also aids move ordering)
+* expand move ordering
+* quiesce search
+### Evaluation
+* different eval for check
 * add more complexity to end game evaluation
+* cache evaluation elements like pawn structures (once I implemented those)?
+### Structure
 * gui
 * remove the second binary crate and move the precomputation work to `cargo build` for the main binary
 
