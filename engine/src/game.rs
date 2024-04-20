@@ -129,10 +129,8 @@ pub fn main_game_loop(humans: u8, depth: u8) -> Vec<(u8, u8)> {
 /* Find all sliders that are attacking the given square by using a fictitious queen that can move in all directions,
 getting all possible moves for that piece and then filtering out the sliders from the resulting bitboard. */
 pub fn get_attacking_sliders(pos: &mut Position, from: u8) -> BitBoard {
-    let super_piece_directions: [(i8, i8); 8] = [(0, 1), (0, -1), (1, 0), (-1, 0), (1, 1), (1, -1), (-1, 1), (-1, -1)];
-    let blocker_positions = movegen::get_all_actual_blockers(&super_piece_directions, from, pos);
     // TODO: This returns too many sliders - assumes every slider can move in all directions
-    let mut attacking_sliders = movegen::get_queen_moves_from_blockers(from, blocker_positions);
+    let mut attacking_sliders = movegen::pseudolegal_slider_moves(3, from, pos);
     attacking_sliders &= pos.piece_bitboards[0] | pos.piece_bitboards[2] | pos.piece_bitboards[3];
     attacking_sliders
 }
@@ -145,34 +143,23 @@ pub fn update_attackers(pos: &mut Position, attackers: BitBoard) {
 
     while attacker_board != BitBoard::empty() {
         let index = attacker_board.trailing_zeros() as u8;
-        if let Some((piece, _color)) = pos.piece_at(index) {
-            match piece {
-                0 => {
-                    let attacks = movegen::get_rook_moves(index, pos);
-                    pos.update_attack_maps(index, attacks);
+        if let Some(piece) = pos.piece_type_at(index) {
+            let attacks = match piece {
+                0 | 2 | 3 => {
+                    movegen::pseudolegal_slider_moves(piece, index, pos)
                 },
                 1 => {
-                    let attacks = movegen::get_pseudolegal_knight_moves(index);
-                    pos.update_attack_maps(index, attacks);
-                },
-                2 => {
-                    let attacks = movegen::get_bishop_moves(index, pos);
-                    pos.update_attack_maps(index, attacks);
-                },
-                3 => {
-                    let attacks = movegen::get_queen_moves(index, pos);
-                    pos.update_attack_maps(index, attacks);
+                    movegen::get_pseudolegal_knight_moves(index)
                 },
                 4 => {
-                    let attacks = movegen::get_king_moves(index, pos);
-                    pos.update_attack_maps(index, attacks);
+                    movegen::get_king_moves(index, pos)
                 },
                 5 => {
-                    let attacks = movegen::pawn_attacks(pos, index);
-                    pos.update_attack_maps(index, attacks);
+                    movegen::pawn_attacks(pos, index)
                 },
-                _ => (),
-            }
+                _ => panic!("Invalid piece type found in update_attackers.")
+            };
+            pos.update_attack_maps(index, attacks);
         } else {
             panic!("Trying to update attackers on empty square {:?}, move history is {:?} and attackers are {:?}",
             index, pos.move_history, attackers);

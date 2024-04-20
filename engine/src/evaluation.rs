@@ -325,31 +325,14 @@ fn get_mobility_score(pos: &Position, midgame: bool) -> i32 {
 fn get_mobility(pos: &Position, square: u8, mobility_range: BitBoard) -> u32 {
     if let Some((piece, _color)) = pos.piece_at(square) {
         match piece {
-            0 => {
-                let directions = &[(0, 1), (0, -1), (1, 0), (-1, 0)];
-                let blockers = movegen::get_first_actual_blockers(directions, square, pos);
-                let mut moves = movegen::slider_moves(square, blockers, directions);
+            0 | 2 | 3 => {
+                let mut moves = movegen::slider_moves(piece, square, pos);
                 // Remove all squares that are not within our mobility range
                 moves &= mobility_range;
                 return moves.count_ones();
             },                    
             1 => {
                 let mut moves = movegen::get_pseudolegal_knight_moves(square);
-                // Remove all squares that are not within our mobility range
-                moves &= mobility_range;
-                return moves.count_ones();
-            },
-            2 => {
-                let directions = &[(1, 1), (1, -1), (-1, 1), (-1, -1)];
-                let blockers = movegen::get_first_actual_blockers(directions, square, pos);
-                let mut moves = movegen::slider_moves(square, blockers, directions);
-                moves &= mobility_range;
-                return moves.count_ones();
-            },
-            3 => {
-                let directions = &[(0, 1), (0, -1), (1, 0), (-1, 0), (1, 1), (1, -1), (-1, 1), (-1, -1)];
-                let blockers = movegen::get_first_actual_blockers(directions, square, pos);
-                let mut moves = movegen::slider_moves(square, blockers, directions);
                 // Remove all squares that are not within our mobility range
                 moves &= mobility_range;
                 return moves.count_ones();

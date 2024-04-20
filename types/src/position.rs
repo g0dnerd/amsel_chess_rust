@@ -1,3 +1,5 @@
+use core::panic;
+
 use crate::{
     state::{State, GameResult},
     bitboard::BitBoard,
@@ -173,6 +175,16 @@ impl Position {
 
     pub fn all_pieces(&self) -> BitBoard {
         self.color_bitboards[0] | self.color_bitboards[1]
+    }
+
+    pub fn piece_color(&self, square: u8) -> Color {
+        if self.color_bitboards[0].contains(square) {
+            Color::White
+        } else if self.color_bitboards[1].contains(square) {
+            Color::Black
+        } else {
+            panic!("No piece at square {} for position::piece_color()", square);
+        }
     }
 
     pub fn make_move(&mut self, from: &u8, to: &u8) {
@@ -379,6 +391,7 @@ impl Position {
     /* Returns true if the given square is under attack by the given color.
     / attack_bitboards contains a bitboard for every square that contains information which other squares the piece
     on that square attacks, if any. */ 
+    #[inline]
     pub fn is_square_attacked_by_color(&self, square: u8, color: Color) -> bool {
         for i in 0..64 {
             // If the square is attacked by a piece on square i
@@ -406,9 +419,7 @@ impl Position {
     pub fn is_promotion(&self, start: &u8, end: &u8) -> bool {
         let (piece, color) = self.piece_at(*start).unwrap();
         if piece == Piece::PAWN {
-            if color == Color::White && end / 8 == 7 {
-                return true;
-            } else if color == Color::Black && end / 8 == 0 {
+            if color == Color::White && end / 8 == 7 || color == Color::Black && end / 8 == 0 {
                 return true;
             }
         }
@@ -459,5 +470,15 @@ impl Position {
             }
         }
         false
+    }
+
+    pub fn piece_type_at(&self, square: u8) -> Option<u8> {
+        if self.piece_bitboards[0].contains(square) {return Some(0)}
+        if self.piece_bitboards[1].contains(square) {return Some(1)}
+        if self.piece_bitboards[2].contains(square) {return Some(2)}
+        if self.piece_bitboards[3].contains(square) {return Some(3)}
+        if self.piece_bitboards[4].contains(square) {return Some(4)}
+        if self.piece_bitboards[5].contains(square) {return Some(5)}
+        None
     }
 }

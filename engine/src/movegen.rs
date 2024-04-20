@@ -2,10 +2,7 @@ use crate::{
     magics::*,
     game
 };
-use precompute::{
-    magics::MagicTableEntry,
-    precompute_magics::{BISHOP, ROOK},
-};
+use precompute::magics::MagicTableEntry;
 use types::{
     bitboard::BitBoard,
     position::Position,
@@ -17,64 +14,47 @@ use types::{
 /* Use our ray-scanning algorithm from the precompute module to get potential blockers for a piece,
 / then AND the result with the all_pieces BitBoard to get the actual blockers. */
 pub fn get_all_actual_blockers(
-    directions: &[(i8, i8)],
+    piece: u8,
     square: u8,
     position: &Position,
 ) -> BitBoard {
-    let mut blockers = BitBoard::empty();
-    // XOR the square and the blocker BitBoard together to remove the piece we are analyzing from the list of potential blockers.
-    let all_pieces = position.all_pieces() ^ BitBoard::from_square(square);
-    for &(dx, dy) in directions {
-        let mut ray = square;
-        while let Some(offset_by_delta) = try_square_offset(ray, dx, dy) {
-            blockers |= BitBoard::from_square(ray);
-            ray = offset_by_delta;
-        }
-    }
-    blockers &= !BitBoard::from_square(square);
-    blockers & all_pieces
+    let mut blockers = match piece {
+        0 => BitBoard::from_u64(ROOK_MAGICS[square as usize].mask),
+        2 => BitBoard::from_u64(BISHOP_MAGICS[square as usize].mask),
+        3 => BitBoard::from_u64(ROOK_MAGICS[square as usize].mask)
+            | BitBoard::from_u64(BISHOP_MAGICS[square as usize].mask),
+        _ => panic!("Piece different than slider passed to movegen::get_all_actual_blockers()"),
+    };
+    blockers &= position.all_pieces();
+    blockers
 }
 
-pub fn get_first_actual_blockers(
-    directions: &[(i8, i8)],
-    square: u8,
-    position: &Position,
-) -> BitBoard {
-    let mut blockers = BitBoard::empty();
-    let all_pieces = position.all_pieces() ^ BitBoard::from_square(square);
-    for &(dx, dy) in directions {
-        let mut ray = square;
-        while let Some(offset_by_delta) = try_square_offset(ray, dx, dy) {
-            ray = offset_by_delta;
-            if position.piece_at(ray).is_some() {
-                blockers |= BitBoard::from_square(ray);
-                break;
-            }
-        }
-    }
-    blockers & all_pieces
+pub fn pseudolegal_slider_moves(piece: u8, square: u8, pos: &Position) -> BitBoard {
+    let blockers = get_all_actual_blockers(piece, square, pos);
+    return match piece {
+        0 => BitBoard::from_u64(ROOK_MOVES[magic_index(&ROOK_MAGICS[square as usize], blockers)]),
+        2 => BitBoard::from_u64(BISHOP_MOVES[magic_index(&BISHOP_MAGICS[square as usize], blockers)]),
+        3 => BitBoard::from_u64(ROOK_MOVES[magic_index(&ROOK_MAGICS[square as usize], blockers)]
+            | BISHOP_MOVES[magic_index(&BISHOP_MAGICS[square as usize], blockers)]),
+        _ => panic!("Piece different than slider passed to movegen::slider_moves()"),
+    };
 }
 
-pub fn slider_moves(square: u8, blockers: BitBoard, directions: &[(i8, i8)]) -> BitBoard {
-    let mut moves = BitBoard::empty();
-    for &(dx, dy) in directions {
-        let mut ray = square;
-        
-        /* Find possible moves with the following procedure:
-        /  1. Start at the piece's square.
-        /  2. Try to offset the square by one of the four delta directions specified below.
-        /  3. Loop terminates if that new square is in the list of blockers.
-        /  4. If not, square gets added to legal moves. */
-        while !blockers.contains(ray) {
-            if let Some(offset_by_delta) = try_square_offset(ray, dx, dy) {
-                ray = offset_by_delta;
-                moves |= BitBoard::from_square(ray);
-            } else {
-                break;
-            }
-        }
-    }
-    moves
+fn slider_moves_from_blockers(piece: u8, square: u8, blockers: BitBoard) -> BitBoard {
+    let moves = match piece {
+        0 => ROOK_MOVES[magic_index(&ROOK_MAGICS[square as usize], blockers)],
+        2 => BISHOP_MOVES[magic_index(&BISHOP_MAGICS[square as usize], blockers)],
+        3 => ROOK_MOVES[magic_index(&ROOK_MAGICS[square as usize], blockers)]
+            | BISHOP_MOVES[magic_index(&BISHOP_MAGICS[square as usize], blockers)],
+        _ => panic!("Piece different than slider passed to movegen::slider_moves()"),
+    };
+    BitBoard::from_u64(moves)
+}
+
+pub fn slider_moves(piece: u8, square: u8, pos: &Position) -> BitBoard {
+    let blockers = get_all_actual_blockers(piece, square, pos);
+    let color = pos.piece_color(square);
+    slider_moves_from_blockers(piece, square, blockers) & !pos.color_bitboards[color as usize]
 }
 
 pub fn get_pseudolegal_knight_moves(square: u8) -> BitBoard {
@@ -96,18 +76,6 @@ pub fn get_pseudolegal_knight_moves(square: u8) -> BitBoard {
     moves
 }
 
-pub fn get_pseudolegal_slider_moves(square: u8, directions: &[(i8, i8)]) -> BitBoard {
-    let mut moves = BitBoard::empty();
-    for &(dx, dy) in directions {
-        let mut ray = square;
-        while let Some(offset_by_delta) = try_square_offset(ray, dx, dy) {
-            ray = offset_by_delta;
-            moves |= BitBoard::from_square(ray);
-        }
-    }
-    moves
-}
-
 pub fn pawn_attacks(position: &mut Position, square: u8) -> BitBoard {
     let mut moves = BitBoard::empty();
     let color = position.piece_at(square).unwrap().1;
@@ -122,6 +90,7 @@ pub fn pawn_attacks(position: &mut Position, square: u8) -> BitBoard {
     moves
 }
 
+#[inline]
 fn magic_index(entry: &MagicTableEntry, blockers: BitBoard) -> usize {
     let blockers = blockers.0 & entry.mask;
     let hash = blockers.wrapping_mul(entry.magic);
@@ -130,63 +99,19 @@ fn magic_index(entry: &MagicTableEntry, blockers: BitBoard) -> usize {
 }
 
 pub fn get_rook_moves(square: u8, position: &Position) -> BitBoard {
+    let blockers = get_all_actual_blockers(0, square, position);
+    return slider_moves_from_blockers(0, square, blockers);
+}
+
+#[inline]
+pub fn get_bishop_moves(square: u8, pos: &Position) -> BitBoard {
     // Handle potential errors when trying to unwrap a piece from an empty square
-    let piece = position.piece_at(square);
-    match piece {
-        None => panic!("get_rook_moves called on empty square"),
-        _ => (),
-    }
-
-    let blockers = get_all_actual_blockers(&ROOK.directions, square, position);
-    let magic_entry = &ROOK_MAGICS[square as usize];
-    let index = magic_index(magic_entry, blockers);
-    let mut moves = BitBoard::from_u64(ROOK_MOVES[index]);
-
-    // Remove all moves that would capture a piece of the same color
-    let color = position.piece_at(square).unwrap().1;
-    moves &= !position.color_bitboards[color as usize];
-    moves
+    slider_moves(2, square, pos)
 }
 
-pub fn get_rook_moves_from_blockers(square: u8, blockers: BitBoard) -> BitBoard {
-    let magic_entry = &ROOK_MAGICS[square as usize];
-    let index = magic_index(magic_entry, blockers);
-    BitBoard(ROOK_MOVES[index])
-}
-
-pub fn get_bishop_moves(square: u8, position: &Position) -> BitBoard {
-    // Handle potential errors when trying to unwrap a piece from an empty square
-    let piece = position.piece_at(square);
-    match piece {
-        None => panic!("get_bishop_moves called on empty square"),
-        _ => (),
-    }
-
-    let blockers = get_all_actual_blockers(&BISHOP.directions, square, position);
-    let magic_entry = &BISHOP_MAGICS[square as usize];
-    let index = magic_index(magic_entry, blockers);
-    let mut moves = BitBoard::from_u64(BISHOP_MOVES[index]);
-
-    // Remove all moves that would capture a piece of the same color
-    let color = position.piece_at(square).unwrap().1;
-    moves &= !position.color_bitboards[color as usize];
-    moves
-}
-
-pub fn get_bishop_moves_from_blockers(square: u8, blockers: BitBoard) -> BitBoard {
-    let magic_entry = &BISHOP_MAGICS[square as usize];
-    let index = magic_index(magic_entry, blockers);
-    BitBoard(BISHOP_MOVES[index])
-}
-
-pub fn get_queen_moves(square: u8, position: &Position) -> BitBoard {
-    get_rook_moves(square, position)
-        | get_bishop_moves(square, position)
-}
-
-pub fn get_queen_moves_from_blockers(square: u8, blockers: BitBoard) -> BitBoard {
-    get_rook_moves_from_blockers(square, blockers)
-        | get_bishop_moves_from_blockers(square, blockers)
+#[inline]
+pub fn get_queen_moves(square: u8, pos: &Position) -> BitBoard {
+    slider_moves(3, square, pos)
 }
 
 pub fn get_knight_moves(square: u8, position: &Position) -> BitBoard {
@@ -311,14 +236,13 @@ pub fn get_all_legal_moves_for_color(color: Color, pos: &mut Position) -> Vec<(u
     let mut moves: Vec<(u8, u8)> = Vec::new();
 
     // Iterate over all squares with a piece of the given color
-    let squares = pos.color_bitboards[color as usize].squares_from_bb();
-    for square in squares {
+    let mut squares = pos.color_bitboards[color as usize];
+    while !squares.is_empty() {
+        let square = squares.trailing_zeros() as u8;
         let piece = pos.piece_at(square).unwrap().0;
         let piece_moves = match piece {
-            0 => get_rook_moves(square, pos),
+            0 | 2 | 3 => slider_moves(piece, square, pos),
             1 => get_knight_moves(square, pos),
-            2 => get_bishop_moves(square, pos),
-            3 => get_queen_moves(square, pos),
             4 => get_king_moves(square, pos),
             5 => get_pawn_moves(square, pos),
             _ => BitBoard::empty(),
@@ -330,6 +254,7 @@ pub fn get_all_legal_moves_for_color(color: Color, pos: &mut Position) -> Vec<(u
             moves.push((square, piece_move));
             piece_moves_iterator.clear_lsb();
         }
+        squares.clear_lsb();
     }
 
     // Iterate over all moves and remove those that would put or leave the king in check
@@ -354,23 +279,24 @@ pub fn get_all_legal_moves_for_color(color: Color, pos: &mut Position) -> Vec<(u
         let mut attackers_to_update = BitBoard::empty();
 
         // Remove the move if it would castle through check
-        let (piece, color) = pos.piece_at(*from).unwrap();
-        if piece == 4 {
-            if to - from == 2 {
-                if pos.is_square_attacked_by_color(from + 1, !color) ||
-                    pos.is_square_attacked_by_color(from + 2, !color)
-                {
-                    moves_to_remove.push((*from, *to));
-                    continue;
-                }
-            } else if (to - from) as i8 == -2 {
-                if pos.is_square_attacked_by_color(from - 1, !color) ||
-                    pos.is_square_attacked_by_color(from - 2, !color) || 
-                    pos.is_square_attacked_by_color(from - 3, !color)
-                {
-                    moves_to_remove.push((*from, *to));
-                    continue;
-                }
+        if is_king && (*to as i8 - *from as i8).abs() == 2 {
+            match to {
+                2 | 58 => {
+                    if pos.is_square_attacked_by_color(*to, !color) ||
+                            pos.is_square_attacked_by_color(*to - 1, !color) ||
+                            pos.is_square_attacked_by_color(*to - 2, !color) {
+                        moves_to_remove.push((*from, *to));
+                        continue;
+                    }
+                },
+                6 | 62 => {
+                    if pos.is_square_attacked_by_color(*to, !color) ||
+                            pos.is_square_attacked_by_color(*to + 1, !color) {
+                        moves_to_remove.push((*from, *to));
+                        continue;
+                    }
+                },
+                _ => (),
             }
         }
 
@@ -395,19 +321,8 @@ pub fn get_all_legal_moves_for_color(color: Color, pos: &mut Position) -> Vec<(u
         }
 
         // Check for promotion, auto-promote to queen for now. Update slider blockers and attacks for the new queen
-        if is_pawn {
-            match !pos.state.active_player {
-                types::Color::White => {
-                    if to / 8 == 7 {
-                        new_pos.promote_pawn(*to, types::Piece::QUEEN);
-                    }
-                },
-                types::Color::Black => {
-                    if to / 8 == 0 {
-                        new_pos.promote_pawn(*to, types::Piece::QUEEN);
-                    }
-                }
-            }
+        if is_pawn && (color as usize == 0 && to / 8 == 7 || color as usize == 1 && to / 8 == 0) {
+            new_pos.promote_pawn(*to, types::Piece::QUEEN);
         }
 
         attackers_to_update |= BitBoard::from_square(*to);
@@ -420,24 +335,13 @@ pub fn get_all_legal_moves_for_color(color: Color, pos: &mut Position) -> Vec<(u
         }
 
         // If after these updates, the king is in the list of attacked squares, the move is illegal
-        match color {
-            Color::White => {
-                let king_square = (new_pos.piece_bitboards[4] & new_pos.color_bitboards[0]).squares_from_bb()[0];
-                if new_pos.is_square_attacked_by_color(king_square, Color::Black) {
-                    moves_to_remove.push((*from, *to));
-                    continue;
-                }
-            },
-            Color::Black => {
-                let king_square = (new_pos.piece_bitboards[4] & new_pos.color_bitboards[1]).squares_from_bb()[0];
-                if new_pos.is_square_attacked_by_color(king_square, Color::White) {
-                    moves_to_remove.push((*from, *to));
-                    continue;
-                }
-            }
+        let king_square = (new_pos.piece_bitboards[4] & new_pos.color_bitboards[color as usize]).trailing_zeros() as u8;
+        if new_pos.is_square_attacked_by_color(king_square, !color) {
+            moves_to_remove.push((*from, *to));
+            continue;
         }
     }
-    // Remove all tuples from moves that are in moves_to_remove
+    // Remove all illegal moves
     moves.retain(|&x| !moves_to_remove.contains(&x));
     moves
 }
@@ -448,24 +352,22 @@ fn get_legal_moves_from_check(color: Color, pos: &mut Position) -> Vec<(u8, u8)>
     let mut moves: Vec<(u8, u8)> = Vec::new();
 
     // Iterate over all squares with a piece of the given color
-    let squares = pos.color_bitboards[color as usize].squares_from_bb();
-    for square in squares {
+    let mut squares = pos.color_bitboards[color as usize];
+    while squares.0 != 0 {
+        let square = squares.trailing_zeros() as u8;
         let piece = pos.piece_at(square).unwrap().0;
-        let piece_moves = match piece {
-            0 => get_rook_moves(square, pos),
+        let mut piece_moves = match piece {
+            0 | 2 | 3 => slider_moves(piece, square, pos),
             1 => get_knight_moves(square, pos),
-            2 => get_bishop_moves(square, pos),
-            3 => get_queen_moves(square, pos),
             4 => get_king_moves(square, pos),
             5 => get_pawn_moves(square, pos),
             _ => BitBoard::empty(),
         };
-
-        let mut piece_moves_iterator = piece_moves;
-        while !piece_moves_iterator.is_empty() {
-            let piece_move = piece_moves_iterator.trailing_zeros() as u8;
+        squares.clear_lsb();
+        while piece_moves.0 != 0 {
+            let piece_move = piece_moves.trailing_zeros() as u8;
             moves.push((square, piece_move));
-            piece_moves_iterator.clear_lsb();
+            piece_moves.clear_lsb();
         }
     }
 
@@ -504,21 +406,10 @@ fn get_legal_moves_from_check(color: Color, pos: &mut Position) -> Vec<(u8, u8)>
         }
 
         // If after these updates, the king is in the list of attacked squares, the move is illegal
-        match color {
-            Color::White => {
-                let king_square = (new_pos.piece_bitboards[4] & new_pos.color_bitboards[0]).squares_from_bb()[0];
-                if new_pos.is_square_attacked_by_color(king_square, Color::Black) {
-                    moves_to_remove.push((*from, *to));
-                    continue;
-                }
-            },
-            Color::Black => {
-                let king_square = (new_pos.piece_bitboards[4] & new_pos.color_bitboards[1]).squares_from_bb()[0];
-                if new_pos.is_square_attacked_by_color(king_square, Color::White) {
-                    moves_to_remove.push((*from, *to));
-                    continue;
-                }
-            }
+        let king_square = (new_pos.piece_bitboards[4] & new_pos.color_bitboards[color as usize]).trailing_zeros() as u8;
+        if new_pos.is_square_attacked_by_color(king_square, !color) {
+            moves_to_remove.push((*from, *to));
+            continue;
         }
     }
     // Remove all tuples from moves that are in moves_to_remove
