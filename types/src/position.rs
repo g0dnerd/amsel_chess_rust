@@ -155,6 +155,7 @@ impl Position {
     }
 
     // Returns the piece at a given square or None if the square is empty
+    #[inline]
     pub fn piece_at(&self, square: u8) -> Option<(u8, Color)> {
         let mask: u64 = 1 << square;
         let color_mask = if self.color_bitboards[0].0 & mask != 0 {
@@ -162,21 +163,12 @@ impl Position {
         } else {
             Color::Black
         };
-        
-        let piece = match (0..=5).find(|&i| self.piece_bitboards[i].0 & mask != 0) {
-            Some(piece_index) => match piece_index {
-                0 => Piece::ROOK,
-                1 => Piece::KNIGHT,
-                2 => Piece::BISHOP,
-                3 => Piece::QUEEN,
-                4 => Piece::KING,
-                5 => Piece::PAWN,
-                _ => panic!("Invalid piece index"),
-            },
-            None => return None,
-        };
-        
-        Some((piece, color_mask))
+
+        let piece_index = (0..=5).find(|&i| self.piece_bitboards[i].0 & mask != 0).unwrap_or(6);
+
+        if piece_index == 6 { return None; }
+
+        Some((piece_index as u8, color_mask))
     }
 
     pub fn all_pieces(&self) -> BitBoard {

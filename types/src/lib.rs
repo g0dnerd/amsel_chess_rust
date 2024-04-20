@@ -48,6 +48,7 @@ impl Piece {
     pub const QUEEN: u8 = 3;
     pub const KING: u8 = 4;
     pub const PAWN: u8 = 5;
+    pub const NO_PIECE: u8 = 6;
 }
 
 pub const PIECE_REPRESENTATIONS: [char; 13] = [
