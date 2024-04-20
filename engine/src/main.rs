@@ -65,6 +65,14 @@ mod tests {
     use types::bitboard::BitBoard;
 
     #[test]
+    fn test_piece_at_for_empty() {
+        let square = 16;
+        let test_pos = Position::new();
+        let piece = test_pos.piece_at(square);
+        assert_eq!(piece, None);
+    }
+
+    #[test]
     fn negate_min_int() {
         let min_int = i32::MIN + 1;
         assert_eq!(-min_int, i32::MAX);
