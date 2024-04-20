@@ -13,7 +13,7 @@ use types::{
 
 /* Use our ray-scanning algorithm from the precompute module to get potential blockers for a piece,
 / then AND the result with the all_pieces BitBoard to get the actual blockers. */
-pub fn get_all_actual_blockers(
+fn get_all_actual_blockers(
     piece: u8,
     square: u8,
     position: &Position,
@@ -40,6 +40,7 @@ pub fn pseudolegal_slider_moves(piece: u8, square: u8, pos: &Position) -> BitBoa
     };
 }
 
+#[inline]
 fn slider_moves_from_blockers(piece: u8, square: u8, blockers: BitBoard) -> BitBoard {
     let moves = match piece {
         0 => ROOK_MOVES[magic_index(&ROOK_MAGICS[square as usize], blockers)],
@@ -96,22 +97,6 @@ fn magic_index(entry: &MagicTableEntry, blockers: BitBoard) -> usize {
     let hash = blockers.wrapping_mul(entry.magic);
     let index = (hash >> entry.shift) as usize;
     entry.offset as usize + index
-}
-
-pub fn get_rook_moves(square: u8, position: &Position) -> BitBoard {
-    let blockers = get_all_actual_blockers(0, square, position);
-    return slider_moves_from_blockers(0, square, blockers);
-}
-
-#[inline]
-pub fn get_bishop_moves(square: u8, pos: &Position) -> BitBoard {
-    // Handle potential errors when trying to unwrap a piece from an empty square
-    slider_moves(2, square, pos)
-}
-
-#[inline]
-pub fn get_queen_moves(square: u8, pos: &Position) -> BitBoard {
-    slider_moves(3, square, pos)
 }
 
 pub fn get_knight_moves(square: u8, position: &Position) -> BitBoard {

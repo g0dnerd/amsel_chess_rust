@@ -82,7 +82,7 @@ mod tests {
     fn moves_rook_b1_initial() {
         let test_pos = Position::new();
         let square = 1;
-        let moves = movegen::get_rook_moves(square, &test_pos);
+        let moves = movegen::slider_moves(0, square, &test_pos);
         assert_eq!(moves, BitBoard::empty());
     }
 
@@ -106,7 +106,7 @@ mod tests {
     fn moves_bishop_c1_initial() {
         let test_pos = Position::new();
         let square = 2;
-        let moves = movegen::get_bishop_moves(square, &test_pos);
+        let moves = movegen::slider_moves(2, square, &test_pos);
         assert_eq!(moves, BitBoard::empty());
     }
 
@@ -114,7 +114,7 @@ mod tests {
     fn moves_queen_d1_initial() {
         let test_pos = Position::new();
         let square = 3;
-        let moves = movegen::get_queen_moves(square, &test_pos);
+        let moves = movegen::slider_moves(3, square, &test_pos);
         assert_eq!(moves, BitBoard::empty());
     }
 
@@ -156,10 +156,11 @@ mod tests {
         let test_pos = Position::new();
         let square = 27;
         let _moves = (movegen::get_king_moves(square, &test_pos),
-                     movegen::get_queen_moves(square, &test_pos),
-                     movegen::get_bishop_moves(square, &test_pos),
+                     movegen::slider_moves(0, square, &test_pos),
                      movegen::get_knight_moves(square, &test_pos),
-                     movegen::get_rook_moves(square, &test_pos));
+                     movegen::slider_moves(2, square, &test_pos),
+                     movegen::slider_moves(3, square, &test_pos),
+                        movegen::get_pawn_moves(square, &test_pos));
     }
 
 }
