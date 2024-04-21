@@ -148,11 +148,7 @@ impl BitBoard {
     // This is achieved by XORing each square with 56
     pub fn colorflip(self) -> Self {
         let mut flipped_self = BitBoard::empty();
-        for i in 0..64 {
-            if self.contains(i) {
-                flipped_self |= BitBoard::from_index(i as usize ^ 56);
-            }
-        }
+        flipped_self.0 = self.0.swap_bytes();
         flipped_self
     }
 

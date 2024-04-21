@@ -13,9 +13,8 @@ Compute and save magic bitboards by running `cargo build --bin precompute`
 
 ## ToDos
 ### Search
-* do we want to store a PV (also aids move ordering)
 * expand move ordering
-* quiescence search
+* do we want to store a PV (also aids move ordering)
 ### Evaluation
 * different eval for check
 * add more complexity to end game evaluation
@@ -25,6 +24,7 @@ Compute and save magic bitboards by running `cargo build --bin precompute`
 * remove the second binary crate and move the precomputation work to `cargo build` for the main binary
 
 ### Done
+* quiescence search
 * dynamic storage of slider paths & attacks to further increase performance
 * cleaned up basic game loop & move generation
 * move game logic for the move loop out of main.rs

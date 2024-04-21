@@ -13,7 +13,7 @@ fn main() {
     let input = input_human_players.trim();
     let human_players = match input.parse::<u8>() {
         Ok(n) => {
-            if n > 1 {
+            if n > 2 {
                 println!("Error: Maximum of 1 human player allowed.");
                 return;
             }
@@ -63,6 +63,21 @@ mod tests {
     use types::position::Position;
     use engine::movegen;
     use types::bitboard::BitBoard;
+
+    #[test]
+    fn colorflip_ranks_1_2() {
+        let bb = BitBoard::from_u64(65535);
+        let flipped = bb.colorflip();
+        assert_eq!(flipped, BitBoard::from_u64(18446462598732840960));
+    }
+
+    #[test]
+    fn colorflip_ranks_7_8() {
+        let bb = BitBoard::from_u64(18446462598732840960);
+        let flipped = bb.colorflip();
+        assert_eq!(flipped, BitBoard::from_u64(65535));
+    }
+
 
     #[test]
     fn test_piece_at_for_empty() {

@@ -122,6 +122,31 @@ pub fn main_game_loop(humans: u8, depth: u8) -> Vec<(u8, u8)> {
             }
             return pos.move_history;
         },
+        2 => {
+            println!("Running benchmark mode for 2 moves.");
+            for _i in 0..2 {
+                pos.print_position();
+                
+                let eval = match pos.state.active_player {
+                    Color::White => evaluation::main_evaluation(&mut pos),
+                    Color::Black => -evaluation::main_evaluation(&mut pos),
+                };
+                if i32::MIN + 1 < eval && eval < i32::MAX {
+                    println!("Current evaluation: {}", eval);   
+                }
+
+                if is_in_checkmate(&mut pos) {
+                    pos.state.game_result = match pos.state.active_player {
+                        types::Color::White => GameResult(Results::BLACK_VICTORY),
+                        types::Color::Black => GameResult(Results::WHITE_VICTORY),
+                    };
+                    println!("{:?} wins by checkmate!", !pos.state.active_player);
+                    return pos.move_history;
+                }
+                make_engine_move(&mut pos, depth);
+            }
+            return pos.move_history;
+        }
         _ => panic!("Invalid number of human players."),
     }
 }
