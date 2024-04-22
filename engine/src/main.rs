@@ -65,6 +65,27 @@ mod tests {
     use types::bitboard::BitBoard;
 
     #[test]
+    fn pawn_attacks_a7_black() {
+        let square_a7: u8 = 55;
+        let attacks = movegen::pawn_attacks(square_a7, 1);
+        assert_eq!(attacks, BitBoard::from_u64(70368744177664));
+    }
+
+    #[test]
+    fn pawn_attacks_e4_white() {
+        let square_e4: u8 = 28;
+        let attacks = movegen::pawn_attacks(square_e4, 0);
+        assert_eq!(attacks, BitBoard::from_u64(171798691840));
+    }
+
+    #[test]
+    fn pawn_attacks_a7_white() {
+        let square_a7: u8 = 55;
+        let attacks = movegen::pawn_attacks(square_a7, 0);
+        assert_eq!(attacks, BitBoard::from_u64(4611686018427387904));
+    }
+
+    #[test]
     fn colorflip_ranks_1_2() {
         let bb = BitBoard::from_u64(65535);
         let flipped = bb.colorflip();

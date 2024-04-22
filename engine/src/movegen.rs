@@ -11,8 +11,29 @@ use types::{
     types_utils::*,
 };
 
+const PAWN_ATTACKS: [[u64; 8]; 2] = [
+    [
+        131072, 327680, 655360, 1310720, 2621440, 5242880, 10485760, 4194304,
+    ],
+    [
+        2, 5, 10, 20, 40, 80, 160, 64,
+    ],
+];
+
+const KNIGHT_MOVES: [u64; 64] = [
+    132096, 329728, 659712, 1319424, 2638848, 5277696, 10489856, 4202496,
+    33816580, 84410376, 168886289, 337772578, 675545156, 1351090312, 2685403152, 1075839008,
+    8657044482, 21609056261, 43234889994, 86469779988, 172939559976, 345879119952, 687463207072, 275414786112,
+    2216203387392, 5531918402816, 11068131838464, 22136263676928, 44272527353856, 88545054707712, 175990581010432, 70506185244672,
+    567348067172352, 1416171111120896, 2833441750646784, 5666883501293568, 11333767002587136, 22667534005174272, 45053588738670592, 18049583422636032,
+    145241105196122112, 362539804446949376, 725361088165576704, 1450722176331153408, 2901444352662306816, 5802888705324613632, 11533718717099671552, 4620693356194824192,
+    288234782788157440, 576469569871282176, 1224997833292120064, 2449995666584240128, 4899991333168480256, 9799982666336960512, 1152939783987658752, 2305878468463689728,
+    1128098930098176, 2257297371824128, 4796069720358912, 9592139440717824, 19184278881435648, 38368557762871296, 4679521487814656, 9077567998918656,
+];
+
 /* Use our ray-scanning algorithm from the precompute module to get potential blockers for a piece,
 / then AND the result with the all_pieces BitBoard to get the actual blockers. */
+#[inline]
 fn get_all_actual_blockers(
     piece: u8,
     square: u8,
@@ -29,6 +50,7 @@ fn get_all_actual_blockers(
     blockers
 }
 
+#[inline]
 pub fn pseudolegal_slider_moves(piece: u8, square: u8, pos: &Position) -> BitBoard {
     let blockers = get_all_actual_blockers(piece, square, pos);
     return match piece {
@@ -40,55 +62,28 @@ pub fn pseudolegal_slider_moves(piece: u8, square: u8, pos: &Position) -> BitBoa
     };
 }
 
-#[inline]
-fn slider_moves_from_blockers(piece: u8, square: u8, blockers: BitBoard) -> BitBoard {
-    let moves = match piece {
-        0 => ROOK_MOVES[magic_index(&ROOK_MAGICS[square as usize], blockers)],
-        2 => BISHOP_MOVES[magic_index(&BISHOP_MAGICS[square as usize], blockers)],
-        3 => ROOK_MOVES[magic_index(&ROOK_MAGICS[square as usize], blockers)]
-            | BISHOP_MOVES[magic_index(&BISHOP_MAGICS[square as usize], blockers)],
-        _ => panic!("Piece different than slider passed to movegen::slider_moves()"),
-    };
-    BitBoard::from_u64(moves)
-}
-
 pub fn slider_moves(piece: u8, square: u8, pos: &Position) -> BitBoard {
     let blockers = get_all_actual_blockers(piece, square, pos);
     let color = pos.piece_color(square);
-    slider_moves_from_blockers(piece, square, blockers) & !pos.color_bitboards[color as usize]
+    return match piece {
+        0 => BitBoard::from_u64(ROOK_MOVES[magic_index(&ROOK_MAGICS[square as usize], blockers)] & !pos.color_bitboards[color as usize].0),
+        2 => BitBoard::from_u64(BISHOP_MOVES[magic_index(&BISHOP_MAGICS[square as usize], blockers)] & !pos.color_bitboards[color as usize].0),
+        3 => BitBoard::from_u64((ROOK_MOVES[magic_index(&ROOK_MAGICS[square as usize], blockers)]
+            | BISHOP_MOVES[magic_index(&BISHOP_MAGICS[square as usize], blockers)]) & !pos.color_bitboards[color as usize].0),
+        _ => panic!("Piece different than slider passed to movegen::slider_moves()"),
+    };
 }
 
+#[inline]
 pub fn get_pseudolegal_knight_moves(square: u8) -> BitBoard {
-    let mut moves = BitBoard::empty();
-    for &(dx, dy) in &[
-        (1, 2),
-        (2, 1),
-        (1, -2),
-        (2, -1),
-        (-1, 2),
-        (-2, 1),
-        (-1, -2),
-        (-2, -1),
-    ] {
-        if let Some(offset_by_delta) = try_square_offset(square, dx, dy) {
-            moves |= BitBoard::from_square(offset_by_delta);
-        }
-    }
-    moves
+    BitBoard::from_u64(KNIGHT_MOVES[square as usize])
 }
 
-pub fn pawn_attacks(position: &mut Position, square: u8) -> BitBoard {
-    let mut moves = BitBoard::empty();
-    let color = position.piece_at(square).unwrap().1;
-    for &dx in &[-1, 1] {
-        if let Some(offset_by_delta) = try_square_offset(square, dx, match color {
-            Color::White => 1,
-            Color::Black => -1,
-        }){
-            moves |= BitBoard::from_square(offset_by_delta);
-        }
-    }
-    moves
+pub fn pawn_attacks(square: u8, color: usize) -> BitBoard {
+    let file_index = square as usize % 8;
+    let rank_index = (square as usize / 8) - 1.clamp(0, 5);
+    let attacks = PAWN_ATTACKS[color][file_index] << (8 * rank_index);
+    BitBoard::from_u64(attacks)
 }
 
 #[inline]

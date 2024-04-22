@@ -161,10 +161,7 @@ pub fn get_attacking_sliders(pos: &mut Position, from: u8) -> BitBoard {
 }
 
 pub fn update_attackers(pos: &mut Position, attackers: BitBoard) {
-    let mut attacker_board = attackers;
-
-    // Remove any unoccupied squares from the list of attackers
-    attacker_board &= pos.color_bitboards[0] | pos.color_bitboards[1];
+    let mut attacker_board = attackers & (pos.color_bitboards[0] | pos.color_bitboards[1]);
 
     while attacker_board != BitBoard::empty() {
         let index = attacker_board.trailing_zeros() as u8;
@@ -180,14 +177,14 @@ pub fn update_attackers(pos: &mut Position, attackers: BitBoard) {
                     movegen::get_king_moves(index, pos)
                 },
                 5 => {
-                    movegen::pawn_attacks(pos, index)
+                    movegen::pawn_attacks(index, pos.piece_color(index) as usize)
                 },
                 _ => panic!("Invalid piece type found in update_attackers.")
             };
             pos.update_attack_maps(index, attacks);
         } else {
-            panic!("Trying to update attackers on empty square {:?}, move history is {:?} and attackers are {:?}",
-            index, pos.move_history, attackers);
+            unreachable!("Trying to update attackers on empty square {:?}.",
+            index);
         }
         attacker_board.clear_lsb();
     }
@@ -312,7 +309,10 @@ pub fn apply_move(pos: &mut Position, from: u8, to: u8) {
     };
 
     match king_square {
-        BitBoard(0) => panic!("No king found for active player {:?} after move history", pos.move_history),
+        BitBoard(0) => {
+            pos.print_position();
+            panic!("No king found for active player {:?} after move {:?} -> {:?}", pos.state.active_player, from, to);
+        },
         _ => 
             // Check if the move puts the enemy king in check
             pos.check = pos.is_square_attacked_by_color(king_square.trailing_zeros() as u8, !pos.state.active_player),

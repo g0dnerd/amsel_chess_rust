@@ -58,6 +58,22 @@ const PAWN_SQUARE_TABLE_MIDGAME: [[i32; 8]; 8] = [
     [0, -5, -22, -8, 5, -8, -8, 0]
 ];
 
+trait PieceSquareTable {
+    fn get_value(&self, piece: usize, rank: usize, file: usize) -> i32;
+}
+
+impl PieceSquareTable for [[i32; 8]; 8] {
+    fn get_value(&self, _piece: usize, rank: usize, file: usize) -> i32 {
+        self[rank][file]
+    }
+}
+
+impl PieceSquareTable for [[[i32; 8]; 4]; 5] {
+    fn get_value(&self, piece: usize, rank: usize, file: usize) -> i32 {
+        self[piece][rank][file]
+    }
+}
+
 // Mobility bonus depending on how many squares a rook can reach (min. 0, max. 14)
 const ROOK_MOBILITY_BONUS_TABLE_MIDGAME: [i32; 15] = [
     -60, -20, 2, 3, 3, 11, 22, 31, 40, 40, 41, 48, 57, 57, 62
@@ -263,15 +279,19 @@ fn get_piece_square_table_value_midgame(pos: &Position) -> i32 {
     let mut psqt_score = 0;
     for piece in 0..6 {
         let piece_bitboard = pos.piece_bitboards[piece] & pos.color_bitboards[0];
-        for square in 0..64 {
-            if !(piece_bitboard & BitBoard::from_square(square)).is_empty() {
-                let rank = cmp::min(7- square/8, square / 8);
-                let file = square % 8;
-                match piece {
-                    5 => psqt_score += PAWN_SQUARE_TABLE_MIDGAME[rank as usize][file as usize],
-                    _ => psqt_score += PIECE_SQUARE_TABLES_MIDGAME[piece][rank as usize][file as usize]
-                }
-            }
+        // Define trait object for piece-square table
+        let piece_square_table: &dyn PieceSquareTable = match piece {
+            5 => &PAWN_SQUARE_TABLE_MIDGAME,
+            _ => &PIECE_SQUARE_TABLES_MIDGAME,
+        };
+        // Iterate over set bits of the piece bitboard
+        let mut bb = piece_bitboard;
+        while bb.0 != 0 {
+            let square = bb.trailing_zeros() as usize;
+            let rank = cmp::min(7 - square / 8, square / 8);
+            let file = square % 8;
+            psqt_score += piece_square_table.get_value(piece, rank as usize, file as usize);
+            bb.clear_lsb(); // Clear the least significant set bit
         }
     }
     psqt_score
@@ -295,6 +315,9 @@ fn get_mobility_score(pos: &Position, midgame: bool) -> i32 {
             },
             1 => {
                 if midgame {
+                    if mobility > 8 {
+                        panic!("Tried to get mobility bonus for a knight on {}, but mobility was {}", string_from_square(index), mobility);
+                    }
                     mobility_score += KNIGHT_MOBILITY_BONUS_TABLE_MIDGAME[mobility as usize];
                 } else {
                     todo!()
