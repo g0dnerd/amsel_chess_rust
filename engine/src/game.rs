@@ -15,8 +15,14 @@ use crate::{
     parse_input,
 };
 
-pub fn main_game_loop(humans: u8, depth: u8) -> Vec<(u8, u8)> {
-    let mut pos = Position::new();
+pub fn main_game_loop(humans: u8, depth: u8, fen: Option<String>) -> Vec<(u8, u8)> {
+    let mut pos = if fen.is_some() {
+        let mut position = Position::from_fen(fen.unwrap());
+        update_attackers(&mut position, !BitBoard::empty());
+        position
+    } else {
+        Position::new()
+    };
     match humans {
         0 => {
             println!("AI vs AI game.");
@@ -37,31 +43,19 @@ pub fn main_game_loop(humans: u8, depth: u8) -> Vec<(u8, u8)> {
                         types::Color::Black => GameResult(Results::WHITE_VICTORY),
                     };
                     println!("{:?} wins by checkmate!", !pos.state.active_player);
+                    println!("FEN: {}", fen_from_pos(&pos));
                     return pos.move_history;
                 }
                 make_engine_move(&mut pos, depth);
+                if pos.state.active_player == Color::Black { pos.state.full_move_counter += 1; }
             }
+            println!("FEN: {}", fen_from_pos(&pos));
             return pos.move_history;
         },
         1 => {
             println!("Human vs AI game.");
             while pos.state.game_result.is_ongoing() {
                 pos.print_position();
-
-                /* println!("Attacked by white:");
-                for i in 0..64 {
-                    if pos.is_square_attacked_by_color(i, Color::White) {
-                        print!("{}, ", string_from_square(i));
-                    }
-                }
-                
-                println!("\nAttacked by black:");
-                for i in 0..64 {
-                    if pos.is_square_attacked_by_color(i, Color::Black) {
-                        print!("{}, ", string_from_square(i));
-                    }
-                }
-                println!(""); */
 
                 let eval = match pos.state.active_player {
                     Color::White => evaluation::main_evaluation(&mut pos),
@@ -76,6 +70,7 @@ pub fn main_game_loop(humans: u8, depth: u8) -> Vec<(u8, u8)> {
                         types::Color::Black => GameResult(Results::WHITE_VICTORY),
                     };
                     println!("{:?} wins by checkmate!", !pos.state.active_player);
+                    println!("FEN: {}", fen_from_pos(&pos));
                     return pos.move_history;
                 }
                 // Get user input in the format of "a1 a2"
@@ -99,6 +94,10 @@ pub fn main_game_loop(humans: u8, depth: u8) -> Vec<(u8, u8)> {
                         }
                         else if o == [97, 97] {
                             make_engine_move(&mut pos, depth);
+                            if pos.state.active_player == Color::Black { pos.state.full_move_counter += 1; }
+                            continue;
+                        } else if o == [96, 96] {
+                            println!("FEN: {}", fen_from_pos(&pos));
                             continue;
                         }
                     }
@@ -113,13 +112,15 @@ pub fn main_game_loop(humans: u8, depth: u8) -> Vec<(u8, u8)> {
                 let target_square = squares[1];
                 
                 match make_player_move(&mut pos, square, target_square) {
-                    Ok(_) => (),
+                    Ok(_) => 
+                        if pos.state.active_player == Color::Black { pos.state.full_move_counter += 1; },
                     Err(e) => {
                         println!("Error: {}", e);
                         continue;
                     }
                 }
             }
+            println!("FEN: {}", fen_from_pos(&pos));
             return pos.move_history;
         },
         2 => {
@@ -141,10 +142,12 @@ pub fn main_game_loop(humans: u8, depth: u8) -> Vec<(u8, u8)> {
                         types::Color::Black => GameResult(Results::WHITE_VICTORY),
                     };
                     println!("{:?} wins by checkmate!", !pos.state.active_player);
+                    println!("FEN: {}", fen_from_pos(&pos));
                     return pos.move_history;
                 }
                 make_engine_move(&mut pos, depth);
             }
+            println!("FEN: {}", fen_from_pos(&pos));
             return pos.move_history;
         }
         _ => panic!("Invalid number of human players."),

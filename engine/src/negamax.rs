@@ -161,7 +161,7 @@ fn negamax(pos: &mut Position, params: &mut SearchParameters) -> i32 {
         }
     } 
 
-    if MATE_IN_ONE_FOUND.load(std::sync::atomic::Ordering::Relaxed) { return i32::MIN; }
+    if MATE_IN_ONE_FOUND.load(std::sync::atomic::Ordering::Relaxed) { return i32::MAX - 1; }
 
     // If we have reached a terminal node (game result), return the evaluation
     if game::is_in_checkmate(pos) {

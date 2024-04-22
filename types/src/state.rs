@@ -9,6 +9,7 @@ pub struct State {
     pub castling_rights: CastlingRights,
     pub en_passant_square: Option<u8>,
     pub half_move_counter: u8,
+    pub full_move_counter: u16,
     pub active_player: Color,
     pub game_result: GameResult,
 }
@@ -19,6 +20,7 @@ impl State {
             castling_rights: CastlingRights::all(),
             en_passant_square: None,
             half_move_counter: 0,
+            full_move_counter: 1,
             active_player: Color::White,
             game_result: GameResult::new(),
         }

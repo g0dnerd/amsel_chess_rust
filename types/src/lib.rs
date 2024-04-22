@@ -76,6 +76,8 @@ impl Castling {
 }
 
 pub mod types_utils {
+    use crate::position::Position;
+
     pub fn try_square_offset(square: u8, dx: i8, dy: i8) -> Option<u8> {
         let (file, rank) = (square % 8, square / 8);
         let (new_file, new_rank) = (file as i8 + dx, rank as i8 + dy);
@@ -90,6 +92,67 @@ pub mod types_utils {
         let file = (square % 8) as u8 + 97;
         let rank = (square / 8) as u8 + 49;
         format!("{}{}", (file as char).to_ascii_uppercase(), (rank as char).to_ascii_uppercase())
+    }
+
+    pub fn fen_from_pos(pos: &Position) -> String {
+        let mut fen = String::new();
+        for rank in (0..8).rev() {
+            let mut empty = 0;
+            for file in 0..8 {
+                let square = rank * 8 + file;
+                let piece: Option<(u8, crate::Color)> = pos.piece_at(square);
+                match piece {
+                    Some(piece) => {
+                        if empty > 0 {
+                            fen.push_str(&empty.to_string());
+                            empty = 0;
+                        }
+                        fen.push(crate::get_piece_representation(piece.0 + 6 * piece.1 as u8 + 1));
+                    }
+                    None => {
+                        empty += 1;
+                    }
+                }
+            }
+            if empty > 0 {
+                fen.push_str(&empty.to_string());
+            }
+            if rank > 0 {
+                fen.push('/');
+            }
+        }
+        fen.push(' ');
+        fen.push(if pos.state.active_player == crate::Color::White { 'w' } else { 'b' });
+        fen.push(' ');
+        let mut castling = String::new();
+        if pos.state.castling_rights.0 & crate::Castling::WHITE_KING_SIDE != 0 {
+            castling.push('K');
+        }
+        if pos.state.castling_rights.0 & crate::Castling::WHITE_QUEEN_SIDE != 0 {
+            castling.push('Q');
+        }
+        if pos.state.castling_rights.0 & crate::Castling::BLACK_KING_SIDE != 0 {
+            castling.push('k');
+        }
+        if pos.state.castling_rights.0 & crate::Castling::BLACK_QUEEN_SIDE != 0 {
+            castling.push('q');
+        }
+        if castling == "" {
+            fen.push('-');
+        } else {
+            fen.push_str(&castling);
+        }
+        fen.push(' ');
+        if let Some(en_passant) = pos.en_passant_square {
+            fen.push_str(&crate::types_utils::string_from_square(en_passant));
+        } else {
+            fen.push('-');
+        }
+        fen.push(' ');
+        fen.push_str(&pos.state.half_move_counter.to_string());
+        fen.push(' ');
+        fen.push_str(&pos.state.full_move_counter.to_string());
+        fen
     }
 }
     

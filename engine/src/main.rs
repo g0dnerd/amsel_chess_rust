@@ -45,10 +45,44 @@ fn main() {
         }
     };
 
+    let mut input_fen = String::new();
+    println!("Enter the depth of the search algorithm. Minimum 1, maximum 8.");
+    std::io::stdin().read_line(&mut input_fen).unwrap();
+    let input = input_fen.trim();
+    let fen = if !input.is_empty() {
+        match input.parse::<String>() {
+            Ok(f) => {
+                Some(f)
+            },
+            Err(_) => {
+                println!("Error: Invalid input. Please enter a number from 1 to 8.");
+                None
+            }
+        } 
+    } else {
+        None
+    };
+
+
     // Main game loop
-    let move_history = game::main_game_loop(human_players, depth);
-    for mv in move_history {
-        println!("{} {}, ", string_from_square(mv.0), string_from_square(mv.1));
+    let move_history = game::main_game_loop(human_players, depth, fen);
+
+    // Print the move history
+    let mut move_history_iter = move_history.iter().peekable();
+    loop {
+        match move_history_iter.next() {
+            Some((start, end)) => {
+                print!("{} ", string_from_square(*start));
+                print!("{} ", string_from_square(*end));
+                if move_history_iter.peek_mut().is_some() {
+                    print!("| ");
+                }
+            },
+            None => {
+                println!();
+                break;
+            }
+        }
     }
 
     // Wait for the user to press enter before closing the program

@@ -1,14 +1,7 @@
 use core::panic;
 
 use crate::{
-    state::{State, GameResult},
-    bitboard::BitBoard,
-    types_utils::string_from_square,
-    Color,
-    Castling,
-    Results,
-    Piece,
-    get_piece_representation,
+    bitboard::BitBoard, get_piece_representation, state::{GameResult, State}, types_utils::{fen_from_pos, string_from_square}, Castling, Color, Piece, Results
 };
 
 /* A position contains the minimum amount of information necessary
@@ -129,6 +122,142 @@ impl Position {
             en_passant_square,
         }    
 
+    }
+
+    pub fn from_fen(fen: String) -> Position {
+        let mut position = Position::new();
+        position.state.castling_rights.0 = Castling::NO_CASTLING;
+        position.color_bitboards = [BitBoard::empty(); 2];
+        position.piece_bitboards = [BitBoard::empty(); 6];
+        let mut rank = 7;
+        let mut file = 0;
+        let mut iter_index = 0;
+        for c in fen.chars().peekable() {
+            match c {
+                '1'..='8' => {
+                    let empty_squares = c.to_digit(10).unwrap();
+                    file += empty_squares as u8;
+                },
+                'p' => {
+                    position.color_bitboards[1] |= BitBoard::from_square(rank * 8 + file);
+                    position.piece_bitboards[5] |= BitBoard::from_square(rank * 8 + file);
+                    file += 1;
+                },
+                'n' => {
+                    position.color_bitboards[1] |= BitBoard::from_square(rank * 8 + file);
+                    position.piece_bitboards[1] |= BitBoard::from_square(rank * 8 + file);
+                    file += 1;
+                },
+                'b' => {
+                    position.color_bitboards[1] |= BitBoard::from_square(rank * 8 + file);
+                    position.piece_bitboards[2] |= BitBoard::from_square(rank * 8 + file);
+                    file += 1;
+                },
+                'r' => {
+                    position.color_bitboards[1] |= BitBoard::from_square(rank * 8 + file);
+                    position.piece_bitboards[0] |= BitBoard::from_square(rank * 8 + file);
+                    file += 1;
+                },
+                'q' => {
+                    position.color_bitboards[1] |= BitBoard::from_square(rank * 8 + file);
+                    position.piece_bitboards[3] |= BitBoard::from_square(rank * 8 + file);
+                    file += 1;
+                },
+                'k' => {
+                    position.color_bitboards[1] |= BitBoard::from_square(rank * 8 + file);
+                    position.piece_bitboards[4] |= BitBoard::from_square(rank * 8 + file);
+                    file += 1;
+                },
+                'P' => {
+                    position.color_bitboards[0] |= BitBoard::from_square(rank * 8 + file);
+                    position.piece_bitboards[5] |= BitBoard::from_square(rank * 8 + file);
+                    file += 1;
+                },
+                'N' => {
+                    position.color_bitboards[0] |= BitBoard::from_square(rank * 8 + file);
+                    position.piece_bitboards[1] |= BitBoard::from_square(rank * 8 + file);
+                    file += 1;
+                },
+                'B' => {
+                    position.color_bitboards[0] |= BitBoard::from_square(rank * 8 + file);
+                    position.piece_bitboards[2] |= BitBoard::from_square(rank * 8 + file);
+                    file += 1;
+                },
+                'R' => {
+                    position.color_bitboards[0] |= BitBoard::from_square(rank * 8 + file);
+                    position.piece_bitboards[0] |= BitBoard::from_square(rank * 8 + file);
+                    file += 1;
+                },
+                'Q' => {
+                    position.color_bitboards[0] |= BitBoard::from_square(rank * 8 + file);
+                    position.piece_bitboards[3] |= BitBoard::from_square(rank * 8 + file);
+                    file += 1;
+                },
+                'K' => {
+                    position.color_bitboards[0] |= BitBoard::from_square(rank * 8 + file);
+                    position.piece_bitboards[4] |= BitBoard::from_square(rank * 8 + file);
+                    file += 1;
+                },
+                '/' => {
+                    rank -= 1;
+                    file = 0;
+                },
+                ' ' => {
+                    match fen.chars().nth(iter_index + 1).unwrap() {
+                        'w' => position.state.active_player = Color::White,
+                        'b' => position.state.active_player = Color::Black,
+                        _ => panic!("Unexpected character in FEN string at index {}: {}", iter_index + 1, fen.chars().nth(iter_index + 1).unwrap()),
+                    }
+                    let iter_inner = iter_index + 3;
+                    for i in 0..4 {
+                        match fen.chars().nth(iter_inner + i).unwrap() {
+                            'K' => {
+                                position.state.castling_rights.0 |= Castling::WHITE_KING_SIDE;
+                                iter_index += 1;
+                            },
+                            'Q' => {
+                                position.state.castling_rights.0 |= Castling::WHITE_QUEEN_SIDE;
+                                iter_index += 1;               
+                            },
+                            'k' => {
+                                position.state.castling_rights.0 |= Castling::BLACK_KING_SIDE;
+                                iter_index += 1;                                
+                            },
+                            'q' => {
+                                position.state.castling_rights.0 |= Castling::BLACK_QUEEN_SIDE;
+                                iter_index += 1;
+                            },
+                            '-' => {
+                                position.state.castling_rights.0 |= Castling::NO_CASTLING;
+                                iter_index += 1;
+                            },
+                            ' ' => {
+                                iter_index += 1;
+                                break;
+                            },
+                            _ => panic!("Unexpected character in FEN string at index {}: {}", iter_inner + i, fen.chars().nth(iter_inner + i).unwrap()),
+                        }
+                    }
+                    iter_index += 3;
+                    match fen.chars().nth(iter_index).unwrap() {
+                        '-' => (),
+                        _ => {
+                            let rank_index = fen.chars().nth(iter_index).unwrap() as u8 - 97;
+                            let file_index = fen.chars().nth(iter_index + 1).unwrap().to_digit(10).unwrap() as u8 + 1;
+                            position.en_passant_square = Some(rank_index * 8 + file_index);
+                        }
+                    }
+                    iter_index += 1;
+                    position.state.half_move_counter = fen.chars().nth(iter_index + 1).unwrap().to_digit(10).unwrap() as u8;
+                    position.state.full_move_counter = fen.chars().nth(iter_index + 3).unwrap().to_digit(10).unwrap() as u16;
+                    break;
+                }
+                _ => panic!("Unexpected character in FEN string at index {}: {}", iter_index, c),
+            }
+            iter_index += 1;
+        }
+        println!("FEN import successful.");
+        position
     }
 
     // Prints out a visual representation of a given board state.
@@ -280,8 +409,8 @@ impl Position {
         match piece {
             Some((Piece::KING, _color)) => (),
             Some((Piece::ROOK, _color)) => (),
-            _ => panic!("Trying to make castling move from {} to {} with move history {:?}",
-                string_from_square(*from), string_from_square(*to), self.move_history),
+            _ => panic!("Trying to make castling move from {} to {} with FEN {:?}",
+                string_from_square(*from), string_from_square(*to), fen_from_pos(self)),
         }
         let piece_type = piece.unwrap().0;
         let color = piece.unwrap().1;
