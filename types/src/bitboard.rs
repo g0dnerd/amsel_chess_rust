@@ -102,7 +102,7 @@ impl BitBoard {
     }
 
     pub fn contains(self, square: u8) -> bool {
-        !(self & BitBoard::from_index(square as usize)).is_empty()
+        !(self.0 & 1 << square as u64 == 0)
     }
 
     pub fn shift_east(&self) -> Self {

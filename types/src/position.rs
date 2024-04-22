@@ -194,16 +194,7 @@ impl Position {
             self.state.half_move_counter = 0;
             // Remove the captured piece from the color and piece bitboards
             let (captured_piece, captured_color) = self.piece_at(*to).unwrap();
-            let captured_piece_index = match captured_piece {
-                Piece::ROOK => 0,
-                Piece::KNIGHT => 1,
-                Piece::BISHOP => 2,
-                Piece::QUEEN => 3,
-                Piece::KING => 4,
-                Piece::PAWN => 5,
-                _ => panic!("Invalid piece"),
-            };
-            if captured_piece_index == 0 {
+            if captured_piece == 0 {
                 match *to {
                     56 => self.state.castling_rights.0 &= !Castling::BLACK_QUEEN_SIDE,
                     63 => self.state.castling_rights.0 &= !Castling::BLACK_KING_SIDE,
@@ -215,7 +206,7 @@ impl Position {
             // self.was_last_move_capture = Some(captured_piece);
             let to_mask = BitBoard::from_square(*to);
             self.color_bitboards[captured_color as usize] ^= to_mask;
-            self.piece_bitboards[captured_piece_index] ^= to_mask;
+            self.piece_bitboards[captured_piece as usize] ^= to_mask;
         } else {
             self.state.half_move_counter += 1;
             // self.halfmove_clock_history.push(self.state.half_move_counter);
@@ -227,14 +218,14 @@ impl Position {
         // Update castling rights
         // self.castling_rights_history.push(self.state.castling_rights);
         match piece {
-            Piece::KING => {
+            4 => {
                 match color {
                     Color::Black => self.state.castling_rights.0 &= !Castling::BLACK_CASTLING,
                     Color::White => self.state.castling_rights.0 &= !Castling::WHITE_CASTLING,
                 }
                 self.en_passant_square = None;
             },
-            Piece::ROOK => {
+            0 => {
                 match color {
                     Color::Black => {
                         if *from == 56 {
@@ -253,7 +244,7 @@ impl Position {
                 }
                 self.en_passant_square = None;
             },
-            Piece::PAWN => {
+            5 => {
                 self.state.half_move_counter = 0;
                 // Set the en passant square if the pawn moved two squares
                 if from / 8 == 1 && to / 8 == 3 {
@@ -270,19 +261,10 @@ impl Position {
 
         let from_mask = BitBoard::from_square(*from);
         let to_mask = BitBoard::from_square(*to);
-        let piece_index = match piece {
-            Piece::ROOK => 0,
-            Piece::KNIGHT => 1,
-            Piece::BISHOP => 2,
-            Piece::QUEEN => 3,
-            Piece::KING => 4,
-            Piece::PAWN => 5,
-            _ => panic!("Invalid piece"),
-        };
         self.color_bitboards[color as usize] ^= from_mask;
         self.color_bitboards[color as usize] |= to_mask;
-        self.piece_bitboards[piece_index] ^= from_mask;
-        self.piece_bitboards[piece_index] |= to_mask;
+        self.piece_bitboards[piece as usize] ^= from_mask;
+        self.piece_bitboards[piece as usize] |= to_mask;
 
         self.state.switch_active_player();
 
@@ -290,14 +272,6 @@ impl Position {
         if self.state.half_move_counter == 100 {
             self.state.game_result = GameResult(Results::DRAW);
         }
-
-        self.move_history.push((*from, *to));
-
-        // Assert that the color bitboards match the piece bitboards
-        assert_eq!(self.color_bitboards[0] | self.color_bitboards[1],
-            self.piece_bitboards[0] | self.piece_bitboards[1] | self.piece_bitboards[2] | self.piece_bitboards[3] | self.piece_bitboards[4] | self.piece_bitboards[5],
-            "Inconsistent position initialization. Color bitboards do not match piece bitboards in move history {:?}.", self);
-        // TODO: update en passant square
     }
 
     pub fn make_castling_move(&mut self, from: &u8, to: &u8) {

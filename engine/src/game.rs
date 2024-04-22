@@ -228,6 +228,7 @@ pub fn make_player_move(pos: &mut Position, from: u8, to: u8) -> Result<(), &'st
     }
 
     apply_move(pos, from, to);
+    pos.move_history.push((from, to));
 
     Ok(())
 }
@@ -239,6 +240,7 @@ pub fn make_engine_move(pos: &mut Position, depth: u8) {
     println!("AI move: {} {}", string_from_square(from), string_from_square(to));
 
     apply_move(pos, from, to);
+    pos.move_history.push((from, to));
 }
 
 pub fn apply_move(pos: &mut Position, from: u8, to: u8) {
