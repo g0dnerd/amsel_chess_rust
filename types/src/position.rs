@@ -304,7 +304,6 @@ impl Position {
             _ => panic!("Invalid castling move"),
         }
 
-        self.move_history.push((*from, *to));
         self.state.half_move_counter += 1;
         // self.halfmove_clock_history.push(self.state.half_move_counter);
         self.attack_bitboards[*from as usize] = BitBoard::empty();
