@@ -165,7 +165,8 @@ fn negamax(pos: &mut Position, params: &mut SearchParameters) -> i32 {
 
     // If we have reached a terminal node (game result), return the evaluation
     if game::is_in_checkmate(pos) {
-        return i32::MIN;
+        // println!("FEN {} is in checkmate, returning highest possible score.", fen_from_pos(pos));
+        return i32::MIN + 2;
     } else if params.depth == 0 {
         if game::is_quiet_position(pos) {
             return evaluation::main_evaluation(pos);

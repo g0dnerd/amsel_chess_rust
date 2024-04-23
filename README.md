@@ -37,3 +37,4 @@ Compute and save magic bitboards by running `cargo build --bin precompute`
 * add lower/upper bound flags to transposition table entries
 
 ## Known issues
+* If multiple paths to forced mate are found that don't include mate in one, there's no guarantee we take a short path

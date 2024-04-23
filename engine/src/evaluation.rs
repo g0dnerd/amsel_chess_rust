@@ -169,7 +169,7 @@ pub fn main_evaluation(pos: &mut Position) -> i32 {
     // Instantly return the lower bound of the evaluation if the position is in checkmate
     // (seen from the side to move - if you are to move and in checkmate, eval is -infinity)
     if game::is_in_checkmate(pos) {
-        return i32::MIN + 1;
+        return i32::MIN + 2;
     }
     let player_to_move = match pos.state.active_player {
         types::Color::White => 1,
