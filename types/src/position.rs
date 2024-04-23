@@ -240,7 +240,7 @@ impl Position {
                     }
                     iter_index += 3;
                     match fen.chars().nth(iter_index).unwrap() {
-                        '-' => (),
+                        '-' => iter_index += 1,
                         _ => {
                             let rank_index = fen.chars().nth(iter_index).unwrap() as u8 - 97;
                             let file_index = fen.chars().nth(iter_index + 1).unwrap().to_digit(10).unwrap() as u8 + 1;
@@ -248,8 +248,45 @@ impl Position {
                         }
                     }
                     iter_index += 1;
-                    position.state.half_move_counter = fen.chars().nth(iter_index + 1).unwrap().to_digit(10).unwrap() as u8;
-                    position.state.full_move_counter = fen.chars().nth(iter_index + 3).unwrap().to_digit(10).unwrap() as u16;
+                    let mut hm_string = "".to_string();
+                    let mut fm_string = "".to_string();
+                    println!("Looking for halfmove clock at index {}", iter_index);
+                    for _ in 0..=2 {
+                        match fen.chars().nth(iter_index) {
+                            Some(a) => {
+                                match a {
+                                    '0'..='9' => {
+                                        hm_string.push_str(&fen.chars().nth(iter_index).unwrap().to_string());
+                                        iter_index += 1;
+                                    },
+                                    _ => {
+                                        iter_index += 1;
+                                        break;
+                                    },
+                                }
+                            },
+                            _ => break,
+                        }
+                    }
+                    println!("Looking for fullmove clock at index {}", iter_index);
+                    for _ in 0..=2 {
+                        match fen.chars().nth(iter_index) {
+                            Some(a) => {
+                                match a {
+                                    '0'..='9' => {
+                                        fm_string.push_str(&fen.chars().nth(iter_index).unwrap().to_string());
+                                        iter_index += 1;
+                                    },
+                                    _ => break,
+                                }
+                            },
+                            _ => break,
+                        }
+                    }
+                    println!("Halfmove counter: {}", hm_string);
+                    println!("Fullmove counter: {}", fm_string);
+                    position.state.half_move_counter = hm_string.parse::<u8>().unwrap();
+                    position.state.full_move_counter = fm_string.parse::<u16>().unwrap();
                     break;
                 }
                 _ => panic!("Unexpected character in FEN string at index {}: {}", iter_index, c),
