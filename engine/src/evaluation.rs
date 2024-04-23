@@ -58,6 +58,55 @@ const PAWN_SQUARE_TABLE_MIDGAME: [[i32; 8]; 8] = [
     [0, -5, -22, -8, 5, -8, -8, 0]
 ];
 
+const PIECE_SQUARE_TABLES_ENDGAME: [[[i32; 8]; 4]; 5] = [
+    // ROOKS
+    [
+        [-9, -12, -6, -6, -5, -6, 4, 18],
+        [-13, -9, -8, 1, 8, 1, 5, 0],
+        [-10, -1, -2, -9, 7, -7, 20, 19],
+        [-9, -2, -6, 7, -6, 10, -5, 13]
+    ],
+    // KNIGHTS
+    [
+        [-96, -67, 40, -35, -45, -51, -69, -100],
+        [-64, -54, -27, -2, -16, -44, -50, -88],
+        [-49, -18, -8, 13, 9, -16, -51, -56],
+        [-21, 8, 29, 28, 39, 17, 12, -17]
+    ],
+    // BISHOPS
+    [
+        [-57, -37, -16, -20, -17, -30, -31, -46],
+        [-30, -13, -1, -6, -1, 6, -20, -42],
+        [-37, -17, -2, 0, -14, 4, -1, -37],
+        [-12, 1, 10, 17, 15, 6, 1, -24]
+    ],
+    // QUEENS
+    [
+        [-69, -55, -39, -23, -29, 38, -50, -75],
+        [-57, -31, -18, -3, -6, -18, -27, -52],
+        [-47, -22, -9, 13, -9, -12, -24, -43],
+        [-26, -4, 3, 24, 21, 1, -8, -36]
+    ],
+    // KINGS
+    [
+        [1, 53, 88, 103, 96, 92, 47, 11],
+        [45, 100, 130, 156, 166, 172, 121, 59],
+        [85, 133, 169, 172, 199, 184, 116, 73],
+        [76, 135, 175, 172, 199, 191, 131, 78]
+    ],
+];
+
+const PAWN_SQUARE_TABLE_ENDGAME: [[i32; 8]; 8] = [
+    [0, -10, -10, 6, 10, 28, 0, 0],
+    [0, -6, -10, -2, 5, -20, -11, 0],
+    [0, 10, -10, -8, 4, 21, 12, 0],
+    [0, 0, 4, -4, -5, 28, 21, 0],
+    [0, 14, 4, -13, -5, 30, 25, 0],
+    [0, 7, 3, -12, -5, 7, 19, 0],
+    [0, -5, -6, -10, 14, 6, 4, 0],
+    [0, -19, -4, -9, 9, 13, 7, 0]
+];
+
 trait PieceSquareTable {
     fn get_value(&self, piece: usize, rank: usize, file: usize) -> i32;
 }
@@ -91,6 +140,22 @@ const QUEEN_MOBILITY_BONUS_TABLE_MIDGAME: [i32; 28] = [
     -30, -12, -8, -9, 20, 23, 23, 35, 38, 53, 64, 65, 65, 66, 67, 67, 72, 72, 77, 79, 93, 108, 108, 108, 110, 114, 114, 116
 ];
 
+const ROOK_MOBILITY_BONUS_TABLE_ENDGAME: [i32; 15] = [
+    -78, -17, 23, 39, 70, 99, 103, 121, 134, 139, 158, 164, 168, 169, 172
+];
+
+const KNIGHT_MOBILITY_BONUS_TABLE_ENDGAME: [i32; 9] = [
+    -81, -56, -31, -16, 5, 11, 17, 20, 25
+];
+
+const BISHOP_MOBILITY_BONUS_TABLE_ENDGAME: [i32; 14] = [
+    -59, -23, -3, 13, 24, 42, 54, 57, 65, 73, 78, 86, 88, 97
+];
+
+const QUEEN_MOBILITY_BONUS_TABLE_ENDGAME: [i32; 28] = [
+    -48, -30, -7, 19, 40, 55, 59, 75, 78, 96, 96, 100, 121, 127, 131, 133, 136, 141, 147, 150, 151, 168, 168, 171, 182, 182, 192, 219
+];
+
 // Phase values for calculation of phase value for tapered evaluation
 // For now, these values are taken from Stockfish
 const MIDGAME_LIMIT: u32 = 15258;
@@ -119,8 +184,8 @@ pub fn main_evaluation(pos: &mut Position) -> i32 {
     /* println!("Phase: {}", phase);
     println!("Scale factor: {}", scale_factor);
     println!("Midgame evaluation: {}, Endgame evaluation: {}", midgame_evaluation, endgame_evaluation); */
-    let evaluation = (midgame_evaluation * phase + ((endgame_evaluation * (128 - phase)))) / 128;
-    // evaluation += tempo(pos);
+    let mut evaluation = (midgame_evaluation * phase + ((endgame_evaluation * (128 - phase)))) / 128;
+    evaluation += tempo(pos);
     evaluation * player_to_move
 }
 
@@ -254,7 +319,7 @@ fn get_midgame_evaluation(pos: &mut Position) -> i32 {
     let mut evaluation_score = 0;
     let pos_flipped = pos.colorflip();
     evaluation_score += get_piece_value_midgame(pos) as i32 - get_piece_value_midgame(&pos_flipped) as i32;
-    evaluation_score += get_piece_square_table_value_midgame(pos) - get_piece_square_table_value_midgame(&pos_flipped);
+    evaluation_score += get_piece_square_table_value(pos, true) - get_piece_square_table_value(&pos_flipped, true);
     evaluation_score += get_mobility_score(pos, true) as i32 - get_mobility_score(&pos_flipped, true) as i32;
     // TODO: pawn structure: isolated, backward, doubled, connected, chained, etc.
     // TODO: piece safety
@@ -275,14 +340,24 @@ fn piece_count(pos: &Position) -> u32 {
     pos.color_bitboards[0].count_ones()
 }
 
-fn get_piece_square_table_value_midgame(pos: &Position) -> i32 {
+fn get_piece_square_table_value(pos: &Position, midgame: bool) -> i32 {
     let mut psqt_score = 0;
     for piece in 0..6 {
         let piece_bitboard = pos.piece_bitboards[piece] & pos.color_bitboards[0];
         // Define trait object for piece-square table
         let piece_square_table: &dyn PieceSquareTable = match piece {
-            5 => &PAWN_SQUARE_TABLE_MIDGAME,
-            _ => &PIECE_SQUARE_TABLES_MIDGAME,
+            5 => {
+                match midgame {
+                    true => &PAWN_SQUARE_TABLE_MIDGAME,
+                    false => &PAWN_SQUARE_TABLE_ENDGAME,
+                }
+            },
+            _ => {
+                match midgame {
+                    true => &PIECE_SQUARE_TABLES_MIDGAME,
+                    false => &PIECE_SQUARE_TABLES_ENDGAME,
+                }
+            },
         };
         // Iterate over set bits of the piece bitboard
         let mut bb = piece_bitboard;
@@ -310,31 +385,28 @@ fn get_mobility_score(pos: &Position, midgame: bool) -> i32 {
                 if midgame {
                     mobility_score += ROOK_MOBILITY_BONUS_TABLE_MIDGAME[mobility as usize];
                 } else {
-                    todo!()
+                    mobility_score += ROOK_MOBILITY_BONUS_TABLE_ENDGAME[mobility as usize];
                 }
             },
             1 => {
                 if midgame {
-                    if mobility > 8 {
-                        panic!("Tried to get mobility bonus for a knight on {}, but mobility was {}", string_from_square(index), mobility);
-                    }
                     mobility_score += KNIGHT_MOBILITY_BONUS_TABLE_MIDGAME[mobility as usize];
                 } else {
-                    todo!()
+                    mobility_score += KNIGHT_MOBILITY_BONUS_TABLE_ENDGAME[mobility as usize];
                 }
             },
             2 => {
                 if midgame {
                     mobility_score += BISHOP_MOBILITY_BONUS_TABLE_MIDGAME[mobility as usize];
                 } else {
-                    todo!()
+                    mobility_score += BISHOP_MOBILITY_BONUS_TABLE_ENDGAME[mobility as usize];
                 }
             },
             3 => {
                 if midgame {
                     mobility_score += QUEEN_MOBILITY_BONUS_TABLE_MIDGAME[mobility as usize];
                 } else {
-                    todo!()
+                    mobility_score += QUEEN_MOBILITY_BONUS_TABLE_ENDGAME[mobility as usize];
                 }
             },
             _ => ()
@@ -462,4 +534,9 @@ fn opposite_bishops(pos: &Position) -> bool {
     let white_bishop_square = white_bishops.trailing_zeros() % 8;
     let black_bishop_square = black_bishops.trailing_zeros() % 8;
     white_bishop_square % 2 != black_bishop_square % 2
+}
+
+// Being the side whose turn it is confers a small bonus
+fn tempo(pos: &Position) -> i32 {
+    28 * if pos.state.active_player == types::Color::White {1} else {-1}
 }

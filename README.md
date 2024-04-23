@@ -20,10 +20,11 @@ Compute and save magic bitboards by running `cargo build --bin precompute`
 * add more complexity to end game evaluation
 * cache evaluation elements like pawn structures (once I implemented those)?
 ### Structure
-* gui
+* UCI support so I don't have to make a GUI myself
 * remove the second binary crate and move the precomputation work to `cargo build` for the main binary
 
 ### Done
+* FEN support
 * quiescence search
 * dynamic storage of slider paths & attacks to further increase performance
 * cleaned up basic game loop & move generation

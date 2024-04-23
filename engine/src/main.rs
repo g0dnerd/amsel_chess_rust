@@ -46,7 +46,7 @@ fn main() {
     };
 
     let mut input_fen = String::new();
-    println!("Enter the depth of the search algorithm. Minimum 1, maximum 8.");
+    println!("Enter a valid FEN string to import it or press enter to start a new game.");
     std::io::stdin().read_line(&mut input_fen).unwrap();
     let input = input_fen.trim();
     let fen = if !input.is_empty() {
@@ -55,7 +55,7 @@ fn main() {
                 Some(f)
             },
             Err(_) => {
-                println!("Error: Invalid input. Please enter a number from 1 to 8.");
+                println!("Error: Invalid input. Please enter a valid FEN string.");
                 None
             }
         } 
